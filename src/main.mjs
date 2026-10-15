@@ -594,8 +594,23 @@ const hub = {
   async saveCredentialValues(credId, input) {
     const raw = JSON.parse(fs.readFileSync(cfg.path, 'utf8'));
     raw.credentials = raw.credentials || [];
-    const cred = raw.credentials.find((c) => c.id === credId);
-    if (!cred) return { ok: false, error: '没有这条凭证：' + credId };
+    let cred = raw.credentials.find((c) => c.id === credId);
+    /**
+     * ⛔ 老板报「凭证保存核验的时候一直失败」：**初始凭据是"隐式"的**（`implicit-<机器人id>`），
+     *    它压根不在 `credentials[]` 数组里 —— 所以下面这一句原来直接把他挡在门外：
+     *      `if (!cred) return { ok:false, error: '没有这条凭证：'+credId }`
+     *    现在：识别 `implicit-<机器人id>` → 改写到**那个机器人自己的密钥条目**
+     *    （也就是 bots[].credentials 引用的那条 ${SECRET:<机器人id>.*}）。
+     */
+    let implicitBotId = null;
+    if (!cred) {
+      const mm = /^implicit-(.+)$/.exec(String(credId));
+      if (mm) {
+        const bot = (raw.bots || []).find((x) => x && String(x.id) === mm[1]);
+        if (bot) implicitBotId = String(bot.id);
+      }
+      if (!implicitBotId) return { ok: false, error: '没有这条凭证：' + credId };
+    }
     const appId = String(input?.appId || '').trim();
     const appSecret = String(input?.appSecret || '').trim();
     if (!appId || !appSecret) return { ok: false, error: 'appId 和 appSecret 都要填' };
@@ -611,6 +626,23 @@ const hub = {
     const bak = (f) => { try { fs.copyFileSync(f, f + '.bak'); } catch { /* ignore */ } };
     bak(SECRETS_PATH); bak(cfg.path);
     try {
+      if (implicitBotId) {
+        // 初始（自带）凭据：明文写进 secrets.json 的 <机器人id> 名下，并确保机器人引用它
+        writeBotHubSecret(implicitBotId, { appId, appSecret });
+        const raw9 = JSON.parse(fs.readFileSync(cfg.path, 'utf8'));
+        const b9 = (raw9.bots || []).find((x) => x && String(x.id) === implicitBotId);
+        if (!b9) throw new Error('配置里找不到这个机器人');
+        b9.credentials = {
+          appId: '${SECRET:' + implicitBotId + '.appId}',
+          appSecret: '${SECRET:' + implicitBotId + '.appSecret}',
+        };
+        fs.writeFileSync(cfg.path, JSON.stringify(raw9, null, 2), 'utf8');
+        loadConfig();
+        hostCache = null;
+        log.info(`初始凭据（${implicitBotId}）已更新并通过验证 —— 应用 1 秒后重启`);
+        setTimeout(() => process.exit(0), 1000);
+        return { ok: true, note: '凭据已验证并保存（明文只在 config\\secrets.json）。应用正在重启，刷新页面即可。' };
+      }
       writeBotHubSecret(credId, { appId, appSecret });
       const raw2 = JSON.parse(fs.readFileSync(cfg.path, 'utf8'));
       const c2 = (raw2.credentials || []).find((c) => c.id === credId);
