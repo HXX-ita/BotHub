@@ -840,6 +840,7 @@ async function refresh(){
       else c.insertAdjacentHTML('beforeend', '<p class="hint">读取配置中…</p>');
       const d = c.querySelector('details.botcfg');
       if (d && !d.dataset.cfgWired) { d.dataset.cfgWired = '1'; queueMicrotask(wireBotCfgBlocks); }
+      applyChannelLogic();       // 按通道类型显示字段
     }
     box.appendChild(c);
   }
@@ -1167,7 +1168,7 @@ for (let i = 0; i < cfgBots.length; i++) {
    * 换通道 → **重新拉一次模型清单**（不然模型下拉还是旧通道的，等于换不了）。
    */
   const chanSel = document.querySelector('.botcfg select[data-k="channel"][data-i="' + i + '"]');
-  if (chanSel) chanSel.addEventListener('change', () => { cfgBots[i].channel = chanSel.value; fillModelSelect(i); });
+  if (chanSel) chanSel.addEventListener('change', () => { cfgBots[i].channel = chanSel.value; fillModelSelect(i); applyChannelLogic(); });
 }
 document.querySelectorAll('.botcfg [data-addcmd]').forEach(btn => btn.onclick = () => {
   const box = document.getElementById('cmds-' + btn.dataset.addcmd);
@@ -1563,6 +1564,44 @@ window.addEventListener('DOMContentLoaded', () => {
  * 老板的规则：一个凭据最多 4 个机器人（**初始机器人不算**）；
  * 满员的凭据直接 disabled + 标「已满」，不给用户"填完才报错"的体验。
  */
+/**
+ * 按"连接方式"显示/隐藏字段（老板的要求）：
+ *   · 只有 DSH 才有的东西：推理等级 / 操作权限 / 只聊天（工具开关）/ 供应商
+ *     —— 云端或本地模型根本没有"动手能力"这些概念，摆在那里只会让人乱填。
+ *   · 接口/模型/密钥 这类只有云端/本地才有：DSH 通道下**不给填**（隐藏 + 禁用）。
+ * 依据是通道的 kind（PUB.channels 里有），不是通道名字 —— 名字是用户自己起的。
+ */
+const DSH_ONLY_K = ["reasoningEffort", "permission", "noTools", "provider"];
+function kindOfChannel(id) {
+  const ch = (((PUB && PUB.channels) || []).find((c) => c.id === id)) || null;
+  return ch ? (ch.kind || "openai") : "openai";
+}
+function applyChannelLogic(scope) {
+  const root = scope || document;
+  root.querySelectorAll(".botcfg").forEach((blk) => {
+    const cs = blk.querySelector('select[data-k="channel"]');
+    if (!cs) return;
+    const isDsh = kindOfChannel(cs.value) === "dsh";
+    for (const k of DSH_ONLY_K) {
+      const el = blk.querySelector('[data-k="' + k + '"]');
+      if (!el) continue;
+      const lab = el.closest("label.f") || el;
+      lab.hidden = !isDsh;                 // 不是 DSH 就不显示
+      el.disabled = !isDsh;                // 顺带禁用，免得还能用键盘填
+    }
+    // 模型/供应商：DSH 用 DSH 的清单，云端用通道的模型名 —— 两个都留着，但 DSH 下供应商没意义
+    const pv = blk.querySelector('select[data-k="provider"]');
+    if (pv && pv.closest("label.f")) pv.closest("label.f").hidden = !isDsh;
+  });
+  // 新增机器人表单：接口/模型/密钥 只在"云端/本地"时显示，且 DSH 时**禁用**（不给填）
+  const kb = document.getElementById("nb-kind");
+  const row = document.getElementById("nb-cloud");
+  if (kb && row) {
+    const isCloud = kb.value === "cloud" || kb.value === "local";
+    row.hidden = !isCloud;
+    row.querySelectorAll("input").forEach((el) => { el.disabled = !isCloud; });
+  }
+}
 function credOptions(bot, pub) {
   const creds = (pub && pub.credentials) || [];
   const cap = (pub && pub.maxBotsPerCred) || 4;
@@ -1635,12 +1674,23 @@ function renderCreds(list, maxPer) {
     const cloud = e.target.value !== 'dsh';
     const box = document.getElementById('nb-cloud');
     if (box) box.hidden = !cloud;
+    /**
+     * ⛔ 老板的要求：**连接方式选 DSH 时，接口/模型/密钥这几个框不给填**。
+     *    只是 hidden 还不够 —— 用 Tab 键或脚本仍能填进去；所以**同时禁用输入框**。
+     *    （统一走 applyChannelLogic()，它把"显隐 + 禁用"一起管，免得两处逻辑打架。）
+     */
+    applyChannelLogic();
     if (!cloud) return;
     const local = e.target.value === 'local';
     document.getElementById('nb-url').value = local ? 'http://127.0.0.1:11434/v1' : 'https://api.openai.com/v1';
     document.getElementById('nb-model').value = local ? 'qwen2.5:7b' : 'gpt-4o-mini';
     document.getElementById('nb-key').value = local ? 'local-no-key' : '${ENV:OPENAI_API_KEY}';
   });
+  /**
+   * 首次渲染也要应用一次：默认连接方式是 DSH，那一行必须是"藏着且禁用"的，
+   * 否则一打开表单就摆着三个能填的框（老板截图里就是这个状态）。
+   */
+  applyChannelLogic();
 
   // 创建机器人
   document.getElementById('nb-go')?.addEventListener('click', async () => {
