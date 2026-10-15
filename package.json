@@ -1,0 +1,25 @@
+{
+  "name": "bothub",
+  "version": "0.1.0",
+  "description": "把自己的 QQ 机器人跑在自己电脑上：一个进程带多个机器人，每个绑不同的模型通道，全链路留痕、自带体检与恢复演练。",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.3.0"
+  },
+  "scripts": {
+    "start": "node src/main.mjs",
+    "setup": "node tools/setup.mjs",
+    "check": "node tools/doctor.mjs"
+  },
+  "dependencies": {
+    "@tencent-connect/qqbot-nodejs": "^1.0.5"
+  },
+  "keywords": [
+    "qq-bot",
+    "qqbot",
+    "chatbot",
+    "windows",
+    "deepseek"
+  ]
+}

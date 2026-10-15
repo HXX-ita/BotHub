@@ -1,0 +1,36 @@
+{
+  "id": "qq-main",
+  "alias": "我的机器人",
+  "platform": "qq",
+  "channel": "dsh-local",
+  "mentionRequired": true,
+  "permission": "workspace-write",
+  "reasoningEffort": null,
+  "noTools": false,
+  "persona": "你是老板电脑上的 AI 助手。中文回答，直接给结论，别客套、别写总结段，回答短一点。",
+  "commands": [
+    {
+      "name": "/状态",
+      "desc": "看它还活着吗、收到多少条",
+      "action": "status"
+    },
+    {
+      "name": "/帮助",
+      "desc": "看有哪些指令",
+      "action": "help"
+    }
+  ],
+  "limits": {
+    "perPeerPerMin": 8
+  },
+  "credential": "cred-1",
+  "credentials": [
+    {
+      "id": "cred-1",
+      "label": "我的机器人账号",
+      "appId": "${SECRET:cred-1.appId}",
+      "appSecret": "${SECRET:cred-1.appSecret}"
+    }
+  ],
+  "note": "一个凭证最多挂 4 个机器人（同一个 appId 同时只能有一条连接，所以同凭证的机器人共用连接、按群白名单分流）。"
+}

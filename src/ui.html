@@ -1,0 +1,1651 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BotHub · 机器人</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f6bff'/%3E%3Ccircle cx='24' cy='26' r='5' fill='white'/%3E%3Ccircle cx='40' cy='26' r='5' fill='white'/%3E%3Crect x='22' y='40' width='20' height='4' rx='2' fill='white'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#f5f6f9; --card:#fff; --line:#e6e8ef; --text:#1d2130; --muted:#7b8298;
+    --accent:#2f6bff; --ok:#17b26a; --warn:#e8a33d; --bad:#e0574f; --radius:14px;
+      --fs:14.5px;
+      /* 层次：三级阴影（贴地/悬浮/抬高）+ 按钮的模糊轮廓光晕 */
+      --sh1:0 1px 2px rgba(16,22,40,.05);
+      --sh2:0 2px 6px rgba(16,22,40,.07), 0 10px 24px -14px rgba(16,22,40,.22);
+      --sh3:0 4px 12px rgba(16,22,40,.09), 0 22px 46px -22px rgba(16,22,40,.30);
+      --ring:rgba(47,107,255,.16);
+      --ring2:rgba(47,107,255,.26);
+      --glow:0 6px 18px -8px rgba(47,107,255,.55);       /* 全局字号基准：设置里可改小/标准/大/特大 */
+      --soft:#fafbff;    /* 卡片内层 */
+      --soft2:#f0f2f8;   /* 标签/代码块 */
+      --input:#fff;      /* 输入框 */
+      --btnbg:#fff;      /* 按钮 */
+      --btnbg2:#fbfcff;  /* 按钮悬停 */
+      --hover:#f5f7fd;   /* 导航悬停 */
+      --on:#eef3ff;      /* 导航选中 */
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       /* ⚠️ 字号用全局基准变量：设置里改"字体大小"就改这一处，其余全是相对 em，一起缩放 */
+       font-size:var(--fs);line-height:1.6;font-family:"Microsoft YaHei","Segoe UI",system-ui,sans-serif}
+
+  /* ── 排版：左侧导航 + 右侧内容（参考 Windows 设置 / VS Code / Docker Desktop）──
+     为什么要改：原来是一条长滚动 + 一堆折叠区，找东西要来回翻；
+     左侧分页让"我在哪、能去哪"一眼看见，内容区一屏一屏地看。 */
+  .layout{display:grid;grid-template-columns:184px 1fr;min-height:100vh}
+  /* 侧栏：一层很淡的竖向渐变，和内容区拉开 */
+  .side{background:linear-gradient(180deg, var(--input), var(--bg));border-right:1px solid var(--line);padding:14px 10px 10px;
+        display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:8px;padding:4px 10px 14px;font-weight:600;font-size:1.034em}
+  .brand img{width:22px;height:22px;border-radius:6px}
+  nav{display:flex;flex-direction:column;gap:2px}
+  nav a{display:block;padding:8px 12px;border-radius:9px;color:var(--muted);cursor:pointer;
+        font-size:0.966em;user-select:none;transition:.12s}
+  nav a:hover{background:var(--hover);color:var(--text)}
+  nav a.on{background:var(--on);color:var(--accent);font-weight:600}
+  /* 连接状态栏：**贴在侧栏最底部**，上面一条横线（老板说的"那条横线"） */
+  .side-foot{margin-top:0;display:flex;align-items:center;gap:8px;padding:10px 12px;
+             border-top:1px solid var(--line);color:var(--muted);font-size:0.862em}
+  .side-foot .dot{width:9px;height:9px;box-shadow:none}
+  main{padding:18px 22px 34px;max-width:960px;min-width:0}
+  /* 顶栏：粘住 + 毛玻璃 —— 滚动时内容从它下面穿过去 */
+  .topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;
+    position:sticky;top:0;z-index:5;padding:10px 0 8px;
+    background:var(--bg);background:color-mix(in srgb, var(--bg) 84%, transparent);backdrop-filter:blur(8px)}
+  .topbar .grow{flex:1 1 220px}
+  .topbar h1{font-size:1.379em;margin:0;font-weight:600}
+  .topbar .sub{color:var(--muted);font-size:0.897em;margin-top:2px}
+  .view{animation:in .16s ease-out}
+  @keyframes in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .view>.card:last-child,.view>div:last-child{margin-bottom:0}
+  /* 身份条：比普通卡片"更靠前"一层（淡渐变 + 同款阴影），一眼看出它是这一页的抬头 */
+  .heroprof{display:flex;gap:18px;flex-wrap:wrap;align-items:center;
+    background:linear-gradient(180deg, var(--card), var(--soft));
+    border:1px solid var(--line);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;box-shadow:var(--sh2)}
+  .hprof{display:flex;gap:9px;align-items:center}
+  .hprof img{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);object-fit:cover}
+  .hprof .avph{width:30px;height:30px;border-radius:50%;border:1px dashed var(--line);display:inline-block}
+
+  /* 按钮：底色 + 一圈**模糊轮廓**（不是死板的实线框），鼠标一碰光晕变明显 */
+  button{font:inherit;border:1px solid var(--line);background:var(--btnbg);color:var(--text);
+         padding:7px 14px;border-radius:9px;cursor:pointer;
+         transition:box-shadow .16s,border-color .16s,transform .12s,background .16s;
+         box-shadow:var(--sh1), 0 0 0 3px transparent}
+  button:hover{border-color:var(--line);background:var(--btnbg2);box-shadow:var(--sh2), 0 0 0 4px var(--ring)}
+  button:active{transform:translateY(1px);box-shadow:var(--sh1), 0 0 0 3px var(--ring)}
+  button:focus-visible{outline:none;box-shadow:var(--sh2), 0 0 0 4px var(--ring2)}
+  /* 能点的东西要"看得出能点"：主按钮=实心(带彩色光晕)，动作按钮=蓝边浅底，次要=灰字 */
+  button.primary{background:var(--accent);border-color:transparent;color:#fff;font-weight:600;
+    box-shadow:var(--glow), 0 0 0 3px transparent}
+  button.primary:hover{background:#2059e6;border-color:transparent;box-shadow:var(--glow), 0 0 0 5px var(--ring2)}
+  button.act{color:var(--accent);border-color:var(--ring2);background:var(--soft);font-weight:600}
+  button.act:hover{background:var(--soft2);border-color:var(--accent);box-shadow:var(--sh2), 0 0 0 4px var(--ring)}
+  button.ghost{color:var(--muted);border-color:var(--line);background:var(--btnbg2);font-weight:400;box-shadow:none}
+  button.ghost:hover{box-shadow:var(--sh1), 0 0 0 4px var(--ring)}
+  button[disabled]{opacity:.5;cursor:default;transform:none;box-shadow:none}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+  /* ★ 开关（指令后面那个）：临时停用一条指令，不用把它删掉 */
+  .sw{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;flex:none}
+  .sw input{position:absolute;opacity:0;width:0;height:0}
+  .sw i{width:34px;height:19px;border-radius:999px;background:#d8dce8;position:relative;transition:.15s;flex:none}
+  .sw i::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
+    background:var(--card);box-shadow:0 6px 24px rgba(10,12,20,.28);transition:.15s}
+  .sw input:checked + i{background:var(--ok)}
+  .sw input:checked + i::after{left:17px}
+  .sw span{font-size:0.828em;color:var(--muted)}
+  .cmdrow.off{opacity:.45}
+
+  /* 状态点 */
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 4px rgba(23,178,106,.13)}
+  .dot.bad{background:var(--bad);box-shadow:0 0 0 4px rgba(224,87,79,.13)}
+  .dot.warn{background:var(--warn);box-shadow:0 0 0 4px rgba(232,163,61,.15)}
+
+  /* ★ 小问号：解释都收在这里，默认不占地方（老板要求"界面简洁、需要解释的点问号"） */
+  .q{width:18px;height:18px;min-width:18px;padding:0;border-radius:50%;font-size:0.793em;line-height:1;
+     color:var(--muted);border-color:var(--line);background:var(--soft2);font-weight:600}
+  .q:hover{color:var(--accent);border-color:var(--accent);background:var(--btnbg)}
+  .pop{box-shadow:var(--sh3);position:absolute;z-index:50;max-width:340px;background:#22262f;color:#f2f4f8;
+       padding:10px 12px;border-radius:10px;font-size:0.883em;line-height:1.6;
+       box-shadow:0 8px 26px rgba(20,24,40,.28)}
+  .pop a{color:#9dc0ff}
+  .pop code{background:rgba(255,255,255,.14);padding:1px 4px;border-radius:4px;font-size:0.828em}
+
+  h2.sec{font-size:0.862em;color:var(--muted);font-weight:600;letter-spacing:.6px;
+         margin:22px 4px 8px}
+  .card.soft{background:var(--soft);border-color:var(--line)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--sh2);
+        padding:15px 17px;margin-bottom:10px}
+  .card h3{margin:0 0 3px;font-size:1.069em;display:flex;align-items:center;gap:8px}
+  .tag{font-size:0.793em;color:var(--muted);background:var(--soft2);border-radius:7px;padding:2px 7px;font-weight:400}
+  .line{color:var(--muted);font-size:0.897em}
+  .line b{color:var(--text);font-weight:600}
+  .btns{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+  details{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+          padding:12px 17px;margin-bottom:10px}
+  details>summary{cursor:pointer;font-weight:600;font-size:0.966em;list-style:none;outline:none;
+                  display:flex;align-items:center;gap:7px}
+  details>summary::-webkit-details-marker{display:none}
+  details>summary::before{content:"▸";color:var(--muted);font-size:0.828em}
+  details[open]>summary::before{content:"▾"}
+  details .body{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+
+  /* 键值表 */
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 18px;font-size:0.931em}
+  .kv dt{color:var(--muted)}
+  .kv dd{margin:0;color:var(--text)}
+  table{width:100%;border-collapse:collapse;font-size:0.931em}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:400}
+  pre{background:var(--soft2);border-radius:10px;padding:12px;max-height:300px;overflow:auto;
+      font-size:0.862em;line-height:1.5;font-family:Consolas,monospace;white-space:pre-wrap;margin:10px 0 0}
+  textarea{width:100%;height:300px;background:var(--input);color:var(--text);border:1px solid var(--line);
+           border-radius:10px;padding:12px;font-size:0.862em;line-height:1.5;font-family:Consolas,monospace}
+  input,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:9px;
+               background:#fff;color:var(--text);width:100%}
+  label.f{display:block;margin:0 0 12px}
+  label.f span{display:block;color:var(--muted);font-size:0.897em;margin-bottom:5px}
+  .note{color:var(--warn);font-size:0.931em;margin:10px 0 0}
+  .hint{color:var(--muted);font-size:0.862em}
+  .okmsg{color:var(--ok)}
+  .badmsg{color:var(--bad)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  /* 一条指令 = 一张两行的小卡：第一行开关/名字/动作/说明/删，第二行整行填内容（不再挤成一团） */
+  .cmdrow{display:grid;grid-template-columns:auto 132px 160px 1fr auto;gap:7px;align-items:center;
+    margin-bottom:8px;padding:8px 10px;border:1px solid var(--line);border-radius:11px;background:var(--soft)}
+  .cmdrow input,.cmdrow select{width:100%}
+  .cmdrow [data-c="value"]{grid-column:2 / -1}
+  .cmdrow button{padding:6px 10px;justify-self:end}
+  @media(max-width:620px){.grid2{grid-template-columns:1fr}}
+
+  /* ── 教学引导（三步分页）：①介绍 ②环境 ③绑定 ── */
+  #welcome{position:fixed;inset:0;background:rgba(12,16,28,.55);backdrop-filter:blur(3px);
+    display:flex;align-items:center;justify-content:center;z-index:50}
+  #welcome[hidden]{display:none}
+  .wbox{width:600px;max-width:94vw;background:var(--card);border:1px solid var(--line);
+    border-radius:18px;padding:0 0 16px;box-shadow:var(--sh3);overflow:hidden}
+  .whead{display:flex;align-items:center;gap:12px;padding:16px 20px 14px;
+    background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--card)), var(--card))}
+  .wlogo{font-size:2.07em;line-height:1;filter:drop-shadow(0 4px 10px rgba(47,107,255,.35))}
+  .wgrow{flex:1 1 auto;min-width:0}
+  .whead h2{margin:0;font-size:1.24em}
+  .wsub{color:var(--muted);font-size:.9em;margin-top:2px}
+  .wdots{color:var(--muted);font-size:.86em;letter-spacing:2px;white-space:nowrap}
+  .wpage{padding:16px 20px 4px;min-height:236px}
+  .whero{font-size:2.76em;text-align:center;margin:6px 0 12px;letter-spacing:6px}
+  .whero span{font-size:.6em;color:var(--muted);vertical-align:middle}
+  .wlead{margin:0 0 10px;line-height:1.7}
+  .wlead2{margin:12px 0 0;color:var(--muted);line-height:1.7;font-size:.95em}
+  .wfeats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .wfeat{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--soft);box-shadow:var(--sh1)}
+  .wfeat b{display:block;margin-bottom:2px}
+  .wfeat span{color:var(--muted);font-size:.88em}
+  .wneed{list-style:none;padding:0;margin:0 0 4px}
+  .wneed li{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;
+    background:var(--soft);box-shadow:var(--sh1);display:flex;justify-content:space-between;gap:10px}
+  .wneed li span{color:var(--muted);font-size:.9em}
+  .wform{display:grid;gap:10px;margin:12px 0 6px}
+  .wform .f{display:grid;grid-template-columns:96px 1fr;align-items:center;gap:10px;margin:0}
+  .wform input{width:100%}
+  .wmini{color:var(--muted);font-size:.86em;margin:6px 0 0}
+  .wbtns2{margin-top:12px}
+  .wlink{display:inline-block;padding:8px 14px;border-radius:9px;background:var(--accent);color:#fff;
+    text-decoration:none;box-shadow:var(--glow)}
+  .wmsg{padding:0 20px;min-height:18px;font-size:.95em}
+  .wfoot{display:flex;gap:10px;align-items:center;padding:6px 20px 0}
+  .wfoot #wLater{margin-left:auto}
+
+  /* 块小标题（把一堆字段归成一块，一块只配一个问号） */
+  .sechead{margin:16px 0 12px;padding:10px 0 0 10px;border-top:1px solid var(--line);border-left:3px solid var(--ring2);font-size:0.897em;
+    color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px}
+  /* 问号：别贴住文字，稍微大一点点好点 */
+  .q{margin-left:7px;width:19px;height:19px;min-width:19px;font-size:0.828em}
+  /* 按钮之间别凑太近 */
+  .row{gap:12px}
+  .cmdrow{gap:10px}
+  .cmdrow button{padding:7px 12px}
+  .cmds{margin-bottom:6px}
+  /* 删指令：红（危险动作要一眼认出来） */
+  .cmdrow [data-delcmd]{color:#d93025;border-color:#f0c4c0;background:#fff}
+  .cmdrow [data-delcmd]:hover{color:#b3261e;border-color:#e0938c;background:#fdf3f2}
+  /* 凭证行：一条凭证一行（名字 / appId / 挂了几个机器人 / 填值） */
+  .credrow{display:grid;grid-template-columns:1fr 150px 1fr auto;gap:10px;align-items:center;
+    padding:9px 0;border-bottom:1px solid var(--line)}
+  .credrow:last-child{border-bottom:0}
+  .credrow input{width:100%}
+  .credrow .who{font-size:0.931em}
+  .credrow .who b{font-weight:600}
+  .credrow .cnt{font-size:0.862em;color:var(--muted)}
+
+    /* ── 深色模式（老板要的"颜色模式：深色 / 浅色 / 跟随 DSH"）──
+       ⚠️ 只换变量、不写第二套样式：所有组件都用 var() 取色，这样"加一个主题"就只是加一段变量。 */
+    html[data-theme="dark"]{
+      --bg:#16181d; --card:#1e2126; --line:#2c3038; --text:#e6e8ee; --muted:#98a0b3;
+      --accent:#4d84ff; --ok:#2ecc7f; --warn:#e8a33d; --bad:#e0574f;
+      --soft:#20242b; --soft2:#262b33; --input:#191c21; --btnbg:#23262c; --btnbg2:#292d34; --hover:#252a32; --on:#2b3240;
+      --sh1:0 1px 2px rgba(0,0,0,.35);
+      --sh2:0 2px 8px rgba(0,0,0,.40), 0 12px 28px -16px rgba(0,0,0,.65);
+      --sh3:0 6px 16px rgba(0,0,0,.45), 0 26px 50px -24px rgba(0,0,0,.75);
+      --ring:rgba(77,132,255,.22);
+      --ring2:rgba(77,132,255,.34);
+      --glow:0 6px 20px -8px rgba(77,132,255,.60);
+    }
+    html[data-theme="dark"] body{background:var(--bg);color:var(--text)}
+    html[data-theme="dark"] button{background:#23262c;color:var(--text);border-color:var(--line)}
+    html[data-theme="dark"] button:hover{background:#292d34;border-color:#3b414c}
+    html[data-theme="dark"] button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    html[data-theme="dark"] button.ghost{background:#20232a;color:var(--muted);border-color:#2c3038}
+    html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{
+      background:#191c21;color:var(--text);border-color:var(--line)}
+    html[data-theme="dark"] .card{background:var(--card);border-color:var(--line)}
+    html[data-theme="dark"] .layout,html[data-theme="dark"] aside{background:#191c21;border-color:var(--line)}
+    html[data-theme="dark"] nav a.on{background:#262b33;color:#fff}
+    html[data-theme="dark"] .heroprof{background:#1e2126;border-color:var(--line)}
+    html[data-theme="dark"] .pop{background:#23262c;border-color:#3b414c;color:var(--text)}
+    html[data-theme="dark"] code{background:#23262c;color:#cfd6e6}
+    html[data-theme="dark"] .wbox{background:#1e2126;border-color:var(--line)}
+  /* 维护对象：机器人 chip（选中高亮，点一下切换） */
+  .picksel{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:5px 10px;border:1px solid var(--line);
+    border-radius:999px;background:var(--soft);cursor:pointer;font-size:.95em;user-select:none;box-shadow:var(--sh1)}
+  .picksel:hover{border-color:var(--ring2);box-shadow:var(--sh1), 0 0 0 4px var(--ring)}
+  .picksel input{margin:0;accent-color:var(--accent)}
+  .picksel.on{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 10%, var(--card))}
+
+  /* ══════════════════════════════════════════════════════════════
+     一致性收口（老板要求：风格/视觉统一、间距一致、悬停必须换字色、
+                大一点的输入框、明显的滚动条）
+     ──────────────────────────────────────────────────────────────
+     为什么放在样式表**最后**：前面各轮改出来的写法比较零散（有的 7px 有的 8px、
+     有的只换背景不换字色），这一节用一套"设计令牌"统一收口，靠后覆盖。
+     ══════════════════════════════════════════════════════════════ */
+  :root{
+    --sp1:6px; --sp2:10px; --sp3:14px; --sp4:18px;      /* 间距阶梯（只准用这四个） */
+    --ctl-h:34px;                                        /* 按钮/输入框统一高度 */
+    --ctl-px:12px;                                        /* 统一左右内边距 */
+    --ctl-r:9px;                                          /* 统一圆角 */
+    --ctl-fs:0.966em;                                     /* 统一控件字号（比正文略小一点点，不再忽大忽小） */
+  }
+  html[data-theme="dark"]{
+    --scroll-thumb:rgba(255,255,255,.22); --scroll-thumb-hover:rgba(255,255,255,.36);
+  }
+
+  /* ── 按钮：一套尺寸，只有配色随变体不同 ── */
+  button{
+    height:var(--ctl-h); min-width:var(--ctl-h);
+    padding:0 var(--ctl-px); border-radius:var(--ctl-r);
+    font-size:var(--ctl-fs); font-weight:500; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  }
+  /* 悬停：**背景和字色一起换**（只换背景会出现"看不清字"，这是老板明确点出的问题） */
+  button{color:var(--text)}
+  button:hover{background:var(--btnbg2); color:var(--accent); border-color:var(--ring2)}
+  button.primary{color:#fff}
+  button.primary:hover{background:#1f57df; color:#fff; border-color:transparent}
+  button.act{color:var(--accent); background:var(--soft)}
+  button.act:hover{background:var(--accent); color:#fff; border-color:transparent}
+  button.ghost{color:var(--muted); background:var(--btnbg2)}
+  button.ghost:hover{background:var(--soft2); color:var(--text); border-color:var(--line)}
+  button[data-delcmd]{color:#d93025}
+  button[data-delcmd]:hover{background:#d93025; color:#fff; border-color:transparent}
+  button[disabled],button[disabled]:hover{opacity:.5; color:var(--muted); background:var(--btnbg); cursor:default}
+
+  /* ── 输入类：高度/内边距/圆角/焦点环全部统一 ── */
+  input,select,textarea{
+    height:var(--ctl-h); padding:0 var(--ctl-px); border-radius:var(--ctl-r);
+    font-size:var(--ctl-fs); line-height:1.5;
+  }
+  input:focus,select:focus,textarea:focus{
+    outline:none; border-color:var(--accent); box-shadow:0 0 0 4px var(--ring);
+  }
+  /* 文本域：上下内边距也要有（原来只有左右，看着挤） */
+  textarea{height:auto; padding:var(--sp2) var(--ctl-px); line-height:1.7}
+
+  /* ── 间距：标签、网格、按钮行，全站一个标准 ── */
+  label.f{margin:0 0 var(--sp3)}
+  label.f>span{margin-bottom:var(--sp1)}
+  .grid2{gap:0 var(--sp4)}
+  .row{gap:var(--sp2)}
+  .btns{gap:var(--sp2)}
+  .card{padding:16px}
+  .card h3{margin:0 0 var(--sp2)}
+  .sechead{margin:var(--sp4) 0 var(--sp3)}
+
+  /* ── 人格提示词：内容多，框给大一点 ── */
+  textarea[data-k="persona"]{min-height:132px; padding:var(--sp2) var(--ctl-px)}
+  textarea[data-k="persona"]::placeholder{color:var(--muted)}
+
+  /* ── 可滚动元素：滚动条要**看得见**（原来几乎隐形） ── */
+  *{scrollbar-width:thin; scrollbar-color:var(--scroll-thumb,rgba(20,26,40,.28)) transparent}
+  ::-webkit-scrollbar{width:11px; height:11px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{
+    background:var(--scroll-thumb,rgba(20,26,40,.28));
+    border:3px solid transparent; background-clip:content-box; border-radius:99px;
+  }
+  ::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-hover,rgba(20,26,40,.5)); background-clip:content-box}
+  ::-webkit-scrollbar-corner{background:transparent}
+  /* 会滚的框加一道内阴影 + 更清楚的边框，一看就知道"里面还有" */
+  textarea,#cfgtext,pre{box-shadow:inset 0 1px 3px rgba(16,22,40,.06)}
+  html[data-theme="dark"] textarea,html[data-theme="dark"] #cfgtext,html[data-theme="dark"] pre{
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.35);
+  }
+  /* 主内容区滚动条离内容留点空 */
+  main{padding-right:2px}
+
+  /* 侧栏里的「重启应用」（设置下面）：整行宽，小字提示在下面 */
+  /* 侧栏里的「重启应用」：老板要求放在**菜单栏最下面、连接状态那条横线的上面**。
+     `margin-top:auto` 把它推到最底（下面紧跟着就是状态栏和它的横线）。 */
+  .side-restart{margin-top:auto;padding:10px 10px 8px;display:grid;gap:6px}
+  .side-restart button{width:100%}
+  .side-restart .hint{font-size:.86em;line-height:1.5;color:var(--muted);margin:0}
+
+  /* ══════════════════════════════════════════════════════════════
+     点击态统一（老板要求：每一个按钮的"点击时的展示效果"也要统一）
+     ──────────────────────────────────────────────────────────────
+     规矩：**按下 = 底色再深一档 + 字色保持够亮 + 下压 1px**。
+     底色按变体给"更深的一档"，字色始终跟底色配（白底就深字、深底就白字），
+     保证按下那一刻也看得清（对比度 ≥3，和悬停同一套判据）。
+     ══════════════════════════════════════════════════════════════ */
+  button:active, button.primary:active, button.act:active,
+  button.ghost:active, button[data-delcmd]:active, .q:active{
+    transform:translateY(1px);
+    box-shadow:var(--sh1), 0 0 0 3px var(--ring2);
+    transition-duration:.05s;                 /* 按下要"跟手"，不能有延迟感 */
+  }
+  button:not(.primary):not(.act):not([data-delcmd]):active{background:var(--soft2); color:var(--text); border-color:var(--ring2)}
+  button.primary:active{background:#1a4cc4; color:#fff}
+  html[data-theme="dark"] button.primary:active{background:#1b47b8; color:#fff}
+  html[data-theme="dark"] button.act:active{background:#1b47b8; color:#fff}
+  button.act:active{background:#1a4cc4; color:#fff; border-color:transparent}
+  button.ghost:active{background:var(--soft2); color:var(--text)}
+  button[data-delcmd]:active{background:#a51d17; color:#fff}
+  /* 「?」小圆按钮：尺寸自成一族（圆形），但悬停/按下的**视觉语言**跟其它按钮一致 */
+  .q{background:var(--btnbg); color:var(--muted); border:1px solid var(--line); transition:background .16s,color .16s,border-color .16s,box-shadow .16s,transform .05s}
+  .q:hover{background:var(--btnbg2); color:var(--accent); border-color:var(--accent); box-shadow:0 0 0 4px var(--ring)}
+  .q:active{background:var(--soft2); color:var(--accent); border-color:var(--accent)}
+  /* 侧栏导航也是"能点的东西"，点击态一起统一（它不占整行背景，所以只压暗字色） */
+  nav a:active{background:var(--on); color:var(--accent); transform:translateY(1px)}
+  /* 复选框：统一强调色 + 悬停有反馈 */
+  input[type=checkbox]{accent-color:var(--accent); width:16px; height:16px; cursor:pointer}
+  input[type=checkbox]:hover{filter:brightness(1.08)}
+
+
+  /* ══════════════════════════════════════════════════════════════
+     框内"最后一行的下边距"归零（老板要求：按钮离框的距离也要一致）
+     ──────────────────────────────────────────────────────────────
+     实测问题：凭证框里最后一个元素还带 10px 下边距 → **按钮到框底 = 27px**，
+     而别的框是 17px（=16px 内边距 + 1px 边框）。归零之后全站一致。
+     ══════════════════════════════════════════════════════════════ */
+  .card > :last-child, .body > :last-child, details > :last-child,
+  .credrow > :last-child, #bots > div > :last-child, .botcfg > :last-child{
+    margin-bottom:0;
+  }
+
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- 左侧导航：像 Windows 设置 / VS Code / Docker Desktop 那样分页，别让人一条长滚动找东西 -->
+  <aside class="side">
+    <div class="brand"><img src="" id="brandIcon" alt="" hidden><span id="brandName">BotHub</span></div>
+    <nav id="nav">
+      <a data-v="status" class="on">状态</a>
+      <a data-v="bots">机器人</a>
+      <a data-v="maint">维护</a>
+      <a data-v="settings">设置</a>
+    </nav>
+    <!-- 重启应用：老板要求放在**左侧菜单栏**（设置下面）。
+         点它只重启、不跳页（处理器里不 reload 页面，滚动位置和当前页都保持）。 -->
+    <div class="side-restart">
+      <button id="restartapp" class="primary">重启应用</button>
+      <div class="hint" id="rebootMsg"></div>
+    </div>
+    <div class="side-foot" id="sideFoot" title="应用 / 机器人 / 连接状态">
+      <span class="dot" id="dot"></span><span id="sideStatus">连接中…</span>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div class="grow">
+        <!-- 每页一个**大标题**（由 showView() 按页面写）；连接状态在左下角。
+             老板要求：大标题下面**不要再挂一行小字**（副标题已去掉）。 -->
+        <h1 id="pageTitle">状态<span id="pageHelp"></span></h1>
+      </div>
+      <div class="row">
+        <button id="openpage" hidden>在浏览器打开</button>
+      </div>
+    </header>
+
+    <!-- ── 状态 ── -->
+    <section class="view" id="view-status">
+      <div id="heroProf" class="heroprof"></div>
+      <div class="card">
+        <h3>平台身份 <span id="statusHelp"></span></h3>
+        <div id="profDetail"></div>
+      </div>
+      <!-- 体检默认**收起来**：面板要简洁，细节点开看（老板："小字不要太多，很多东西不解释别人也能懂"） -->
+      <details class="card" id="techBox">
+        <summary>体检 <span id="techHelp"></span><span class="hint" id="techSum"></span></summary>
+        <div class="body" id="tech">加载中…</div>
+      </details>
+      <details id="credwrap">
+        <summary>凭据 <span id="credHelp"></span></summary>
+        <div class="body" id="cred"></div>
+      </details>
+    </section>
+
+    <!-- ── 机器人 ── -->
+    <section class="view" id="view-bots" hidden>
+      <!-- ── 新增机器人：放在**本页最上面**（老板要求），下面就是已有的机器人列表；
+           每新增一个，下面的列表就多一张卡。表单在 #bots 之外，所以列表重绘不会把它刷掉。 ── -->
+      <div class="card" id="newbot">
+        <h3>新增机器人</h3>
+        <div class="grid2">
+          <label class="f"><span>机器人 id</span>
+            <input id="nb-id" placeholder="例如 bot2"></label>
+          <label class="f"><span>显示名</span>
+            <input id="nb-alias" placeholder="例如 小助手"></label>
+        </div>
+        <div class="grid2">
+          <label class="f"><span>连接方式</span>
+            <select id="nb-kind">
+              <option value="dsh">DSH</option>
+              <option value="cloud">云端大模型</option>
+              <option value="local">本地模型</option>
+            </select></label>
+          <label class="f"><span>用哪个凭证</span>
+            <select id="nb-cred"></select></label>
+        </div>
+        <label class="f" id="nb-cloud" hidden><span>接口 / 模型 / 密钥</span>
+          <div class="row" style="gap:10px">
+            <input id="nb-url" style="flex:2" placeholder="https://api.openai.com/v1">
+            <input id="nb-model" style="flex:1" placeholder="模型名">
+            <input id="nb-key" style="flex:1" placeholder="${ENV:OPENAI_API_KEY}">
+          </div></label>
+        <div class="row">
+          <button class="primary" id="nb-go">创建</button>
+          <span class="hint" id="nb-msg"></span>
+        </div>
+      </div>
+      <div id="bots"></div>
+    </section>
+
+    <!-- ── 维护 ── -->
+    <section class="view" id="view-maint" hidden>
+      <!-- ⚠️ 这里必须是 **占位 span**，不能直接写 ${qBtn(...)}：
+           这块是静态 HTML，模板语法会**原样显示**成一串字符（技能里记过这个坑，我又踩了一次）。 -->
+      <!-- 老板要求：大标题下面不要再挂一行小字 —— 这里原来是重复的「维护 ?」小标题，已删；
+           「?」挪到大标题旁边（showView 里按页面注入 #pageHelp）。 -->
+      <div class="body" id="maint">统计中…</div>
+
+      <!-- ── 高级：直接改配置文件（JSON）—— 老板要求放维护里（这是"动底层"的活，跟维护是一类） ── -->
+      <details style="margin-top:14px">
+        <summary>高级：直接改配置文件（JSON） <span id="jsonHelp"></span></summary>
+        <div class="body">
+          <p class="hint" id="cfgpath"></p>
+          <textarea id="cfgtext" spellcheck="false"></textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="primary" id="cfgsave">保存并校验</button>
+            <button class="ghost" id="cfgreset">放弃改动</button>
+            <span id="cfgmsg" class="hint"></span>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ── 设置 ── -->
+    <section class="view" id="view-settings" hidden>
+      <!-- 说明：机器人的配置**不在这里**了 —— 在「机器人」页，每个机器人一个下拉 -->
+      <!-- ── 软件本身的两件事：重启应用 + 颜色模式（老板要求：重启按钮放设置里、加颜色模式） ── -->
+      <div class="card" id="appcard">
+        <h3>软件</h3>
+        <div class="grid2">
+          <label class="f"><span>颜色模式</span>
+            <select id="themeMode">
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+              <option value="dsh">跟随 DSH</option>
+            </select></label>
+          <label class="f"><span>字体大小</span>
+            <select id="fontSize">
+              <option value="small">小</option>
+              <option value="normal">标准</option>
+              <option value="large">大</option>
+              <option value="xlarge">特大</option>
+            </select></label>
+        </div>
+      </div>
+
+
+      <!-- ── 凭证：一个凭证最多挂 4 个机器人 ── -->
+      <div class="card" id="creds">
+        <h3>凭证 <span class="hint" id="cred-hint"></span></h3>
+        <div id="cred-list"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="ghost" id="cred-new">+ 新增凭证</button>
+          <input id="cred-new-label" placeholder="给新凭证起个名（可留空）" style="max-width:220px">
+          <span class="hint" id="cred-msg"></span>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+    <button id="reshow-welcome">重新看一遍教学（填 AppID / AppSecret）</button>
+  </div>
+
+      <!-- 重启应用已挪到**左侧菜单栏**（设置下面），这里不再重复放一个 ——
+           同一个 id 出现两次会让 getElementById 只认第一个，另一个变成"点了没反应"。 -->
+</section>
+  </main>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const api = async (p, opt) => { const r = await fetch(p, opt); let j = null; try { j = await r.json(); } catch {} return j || {}; };
+const post = (p, body) => api(p, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body||{}) });
+const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function ago(sec){
+  if (sec === null || sec === undefined) return '还没有';
+  if (sec < 60) return sec + ' 秒前';
+  if (sec < 3600) return Math.round(sec/60) + ' 分钟前';
+  if (sec < 86400) return Math.round(sec/3600) + ' 小时前';
+  return Math.round(sec/86400) + ' 天前';
+}
+
+let lastStatus = null;
+
+/* ─────────────────────────────────────────────────────────────
+ * 小问号：界面上**只留有用信息**，解释一律收进「?」，点一下弹出来。
+ * 老板的要求原话："不需小字信息只保留有用信息，需要解释的按钮在后面做一个小问号"。
+ * ───────────────────────────────────────────────────────────── */
+const TIPS = {
+  hero: '平台上的名字、头像、AppID —— 只能读，改要去 QQ 开放平台。',
+  botBase: '这些是<strong>它在你群里怎么表现</strong>：<br>· <b>显示名</b>：只影响这个面板怎么叫它，不动平台<br>· <b>群里必须 @ 它</b>：开着就只理被 @ 的消息，私聊不受影响<br>· <b>每分钟最多回几条</b>：防止它刷屏<br>· <b>自定义指令</b>：整条消息等于指令名才触发（<code>/状态</code>），能查到指令菜单<br>· <b>单条最长处理秒数</b>：等模型太久就放弃，别让它卡死',
+  botModel: '这些决定它<strong>用哪个脑子、能干什么</strong>：<br>· <b>模型通道</b>：DSH＝会干活（读文件、跑命令、用技能）；云端模型＝只会聊天<br>· <b>模型</b>：留空＝跟随 DSH，<b>免费插件的自动轮切才生效</b>；指定＝钉住它（会绕过轮切）<br>· <b>推理等级</b>：高＝想得多但慢；有些模型不支持，会自动忽略<br>· <b>操作权限</b>：只读 / 可改工作目录 / 完全放开（DSH 的沙箱预设）<br>· <b>只聊天</b>：把工具全收起来，它就只能说话',
+  cred: '去哪儿找这两个值：<br>1. 打开 <b>QQ 开放平台</b>（手机 QQ 扫码登录）<br>2. <b>机器人</b> → 选中你的机器人 → <b>开发设置</b><br>3. 复制 <b>AppID</b> 和 <b>AppSecret</b> 到这里，点「保存并验证」<br>⚠️ 保存前会拿它真连一次 QQ，<b>连不上就一个字都不写</b>；明文只进本机的 <code>config\secrets.json</code>。',
+  maintAll: '· <b>压缩会话</b>：旧聊天压成摘要 + 关键词，<b>不清空</b>，下次还认得<br>· <b>清空会话</b>：删光，不可恢复<br>· <b>清日志 / 清缓存</b>：不动登录态<br>· <b>回收内存</b>：把不用的内存还回去',
+  tech: '这几行是<strong>体检结果</strong>：配置读得到吗、机器人在不在跑、模型通道通不通。<br>点「刷新」重新体检。',
+  json: '高手用的：直接改配置文件。<br><b>保存会先校验，坏配置自动回滚</b>，所以不用怕写坏。',
+  prof: '名字和头像只能读；改要去 QQ 开放平台。',
+};
+const qBtn = (k) => `<button class="q" data-tk="${k}" type="button">?</button>`;
+let pop = null;
+function hidePop() { if (pop) { pop.remove(); pop = null; } }
+function showPop(btn) {
+  const html = TIPS[btn.dataset.tk]; if (!html) return;
+  hidePop();
+  pop = document.createElement('div');
+  pop.className = 'pop'; pop.innerHTML = html;
+  document.body.appendChild(pop);
+  const r = btn.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+  let left = r.left + window.scrollX + r.width / 2 - pop.offsetWidth / 2;
+  left = Math.max(8 + window.scrollX, Math.min(left, window.scrollX + vw - pop.offsetWidth - 8));
+  let top = r.bottom + window.scrollY + 6;
+  if (r.bottom + pop.offsetHeight + 12 > document.documentElement.clientHeight) top = r.top + window.scrollY - pop.offsetHeight - 6;
+  pop.style.left = left + 'px'; pop.style.top = top + 'px';
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.q');
+  if (b) { e.preventDefault(); e.stopPropagation(); (pop && pop.dataset.owner === b.dataset.tk) ? hidePop() : (showPop(b), pop.dataset.owner = b.dataset.tk); return; }
+  if (!e.target.closest('.pop')) hidePop();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hidePop(); });
+/** 把静态 HTML 里预留的占位（如 #heroHelp）填成问号 */
+function mountHelp() {
+  for (const [id, k] of Object.entries({ credHelp: 'cred', techHelp: 'tech', jsonHelp: 'json', statusHelp: 'prof', maintHelp: 'maintAll' })) {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.done) { el.innerHTML = qBtn(k); el.dataset.done = '1'; }
+  }
+}
+
+  /**
+   * 左下角那行连接状态（老板要求「连接状态放在左下角就可以了」）。
+   * `kind` 传 ok / warn / bad 时顺手改那个小圆点。
+   */
+  function setFoot(kind, text) {
+    const d = document.getElementById('dot'), s = document.getElementById('sideStatus');
+    if (d && kind) d.className = 'dot ' + kind;
+    if (s && text) s.textContent = text;
+  }
+
+  /** 重启进度写在设置卡里（原来写在顶部大标题下面，现在那儿是页面标题） */
+  function setRebootMsg(msg) {
+    const el = document.getElementById('rebootMsg');
+    if (el) el.textContent = msg ? ' · ' + msg : '';
+  }
+
+  /**
+   * ── 颜色模式：浅色 / 深色 / 跟随 DSH ──
+   * 「跟随 DSH」= 读 **DSH 自己的主题设置**（`profiles/desktop` 里 `ui-theme.preference`），
+   * 读不到就退回系统偏好（`prefers-color-scheme`）。选择存在服务端（`config/local.json`），
+   * 所以换浏览器、清了缓存也还在。
+   */
+  let themeChoice = null, dshTheme = null;
+  /** 全局字体大小（四档）→ 写进 --fs；其余字号都是相对 em，所以一改全站跟着变 */
+  const FONT_PX = { small: '13.5px', normal: '14.5px', large: '16px', xlarge: '17.5px' };
+  let fontChoice = null;
+  function applyFont() {
+    const px = FONT_PX[fontChoice] || FONT_PX.normal;
+    document.documentElement.style.setProperty('--fs', px);
+    const sel = document.getElementById('fontSize');
+    if (sel && sel.value !== (fontChoice || 'normal')) sel.value = fontChoice || 'normal';
+  }
+  function applyTheme() {
+    const mode = themeChoice || 'light';
+    let real = mode;
+    if (mode === 'dsh') real = dshTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.dataset.theme = real === 'dark' ? 'dark' : 'light';
+    const sel = document.getElementById('themeMode');
+    if (sel && sel.value !== mode) sel.value = mode;
+  }
+  async function loadTheme() {
+    try {
+      const r = await api('/api/prefs');
+      themeChoice = r.theme || null; dshTheme = r.dshTheme || null; fontChoice = r.fontSize || 'normal';
+      applyTheme(); applyFont();
+    } catch { applyTheme(); }
+  }
+  const fontSel = document.getElementById('fontSize');
+  if (fontSel) fontSel.onchange = async (e) => {
+    fontChoice = e.target.value;
+    applyFont();
+    try { await post('/api/prefs', { fontSize: fontChoice }); } catch { /* 存不上只影响下次打开 */ }
+  };
+
+  const themeSel = document.getElementById('themeMode');
+  if (themeSel) themeSel.onchange = async (e) => {
+    themeChoice = e.target.value;
+    applyTheme();
+    try { await post('/api/prefs', { theme: themeChoice }); } catch { /* 存不上只影响下次打开 */ }
+  };
+
+async function refresh(){
+  let st = null, host = null, pub = null;
+  try { st = await api('/api/status'); } catch {}
+  try { host = await api('/api/host'); } catch {}
+  /** 凭证清单（面板要显示"一个凭证挂了几/4 个机器人"，值只给掩码） */
+  try { pub = await api('/api/config'); } catch {}
+  /**
+   * ⛔ `pub` 是 refresh() 的**局部变量**，而机器人配置块是在别的函数里渲染的 ——
+   *    在那里直接用 `pub` 会 ReferenceError（实测：机器人页整个渲染不出来）。
+   *    所以另存一份到模块级 PUB，模板统一用它。
+   */
+  if (pub) {
+    PUB = pub;
+    /**
+     * ⛔ 机器人配置块可能在"公开配置到达之前"就渲染过了（那时凭据下拉是空的：显示「（还没有凭据）」）。
+     *    所以第一次拿到凭据清单后，强制重建一次配置块。
+     */
+    const hasCred = (pub.credentials || []).length > 0;
+    if (hasCred && !window.__credFilled) { window.__credFilled = true; cfgLoaded = false; try { loadCfg(); } catch (e) { console.warn(e); } }
+  }
+  if (pub) { try { renderCreds(pub.credentials || [], pub.maxBotsPerCred || 4); } catch (e) { console.warn('凭证渲染失败', e); } }
+  mountHelp();
+  /**
+   * 体检默认**收起**（面板要简洁：小字不要太多）。Chrome 会记住上一次的展开状态，
+   * 所以这里显式定一次：只有用户自己点开过（本会话内）才保持展开。
+   */
+  {
+    const d = document.getElementById('techBox');
+    if (d) {
+      if (sessionStorage.getItem('bothub-tech-open') !== '1') d.open = false;
+      d.addEventListener('toggle', () => sessionStorage.setItem('bothub-tech-open', d.open ? '1' : '0'));
+    }
+  }
+  if (!st) { $('#dot').className='dot bad'; const ss=document.getElementById('sideStatus'); if (ss) ss.textContent='连不上应用 —— 双击 start.cmd'; return; }
+  lastStatus = st;
+
+  const bots = st.bots || [];
+  const live = bots.filter(b => b.running);
+  const lastMsg = bots.reduce((m,b) => Math.max(m, b.lastMessageAt || 0), 0);
+  const lastMsgSec = lastMsg ? Math.round((Date.now()-lastMsg)/1000) : null;
+
+  // 提醒分两级：只有 warn 才算"要注意"，info 只是说明（假警报会让真警报没人看）
+  const ns = (host && host.notes) ? host.notes.map(n => typeof n === 'string' ? {level:'warn', text:n} : n) : [];
+
+  // 顶部一句话：只有"结论 + 两个关键数字"，其余都在问号里
+  if (live.length === 0) {
+    $('#dot').className = 'dot bad';
+    setFoot('bad', '机器人没在跑');
+    setFoot(null, '机器人没在跑 —— 到设置里点「重启应用」');
+  } else {
+    const problem = ns.some(n => n.level === 'warn');
+    $('#dot').className = problem ? 'dot warn' : 'dot ok';
+    setFoot(problem ? 'warn' : 'ok', problem ? '有需要注意的地方' : '机器人已连接');
+    const bits = [live.length + ' 个在跑'];
+    bits.push(lastMsgSec === null ? '还没收到过消息' : '最后收到 ' + ago(lastMsgSec));
+    setFoot(null, (problem ? '有需要注意的地方 · ' : '机器人已连接 · ') + bits.join(' · '));
+  }
+
+  renderHeroProfile();
+  /**
+   * 左下角那行状态**只写一次**（前面 setFoot 已经把"连接状态 + 细节"写好了）。
+   * ⛔ 原来这里又覆盖了一次（只写"1 个在跑"），把连接状态盖掉 ——
+   *    老板要的正是"连接状态放左下角"，被盖掉等于没做。判据：一行里既要有连接状态、也要有数量。
+   */
+  if (/^(连不上|机器人没在跑)/.test(document.getElementById('sideStatus')?.textContent || '')) {
+    /* 前面已经写了明确的坏消息，别覆盖 */
+  } else {
+    setFoot(null, (live.length ? '已连接 · ' + live.length + ' 个在跑' : '已连接 · 机器人没在跑')
+      + (lastMsgSec === null ? '' : ' · 最后收到 ' + ago(lastMsgSec)));
+  }
+
+  // 机器人卡片
+  const box = $('#bots');
+  /**
+   * ⚠️ **先把已存在的「配置下拉」摘下来存好**，再重画卡片，最后原样挂回去。
+   *   为什么不能直接重画：refresh() 每 5 秒跑一次，重画会**清掉老板正在填的内容**、
+   *   还会把展开的下拉收起来（体验上就是"写一半没了"）。搬节点则值和展开状态都保留。
+   */
+  const keepCfg = new Map();
+  // ⚠️ 连**展开状态**一起记住：DOM 节点搬家时 open 属性有时会掉，显式带回来最稳
+  box.querySelectorAll('details.botcfg').forEach((d) => keepCfg.set(d.dataset.cfgbot, { node: d, open: d.open }));
+  box.innerHTML = '';
+  for (const b of bots) {
+    const q = b.queue || {};
+    const c = document.createElement('div'); c.className = 'card';
+    c.innerHTML = `
+      <h3><span class="dot ${b.running?'ok':'bad'}" style="width:10px;height:10px"></span><span class="prof-name" id="pn-${esc(b.id)}">${esc(b.alias || b.id)}</span>
+        <span class="tag">${esc(b.channel)}</span><span class="tag" title="${b.modelPinned ? '面板上钉住了这个模型（插件轮切会被绕过）' : '跟随 DSH 默认（免费插件的自动轮切生效）'}">${b.modelPinned ? '指定 ' : ''}${esc(b.model || '')}</span>${qBtn('prof')}</h3>
+      <div class="prof" id="prof-${esc(b.id)}"></div>
+      <div class="line">
+        收到 <b>${b.messagesIn}</b> 条 · 回了 <b>${b.repliesOut}</b> 条 · 最后收到 <b>${ago(b.lastMessageSecAgo)}</b>
+        ${q.busyLanes||q.queued ? `<br>正在处理 <b>${q.busyLanes}</b> 条 · 排队 <b>${q.queued}</b> 条` : ''}
+        ${b.lastError ? `<br><span class="badmsg">最后出错：${esc(b.lastError)}</span>` : ''}
+      </div>
+      <div class="btns">
+        <button class="act" data-restart="${esc(b.id)}">重启</button>
+        <button class="act" data-kick="${esc(b.id)}">断开重连</button>
+        <button class="act" data-logs="${esc(b.id)}">看日志</button>
+        <button class="ghost" data-prof="${esc(b.id)}" title="重新从平台取一次资料">刷新资料</button>
+        
+      </div>
+      <pre id="log-${esc(b.id)}" style="display:none"></pre>`;
+    // 把配置下拉挂到这张卡里（有旧的就直接搬过来，内容和展开状态都留着）
+    {
+      const kept = keepCfg.get(b.id);
+      if (kept) { c.appendChild(kept.node); kept.node.open = kept.open; }   // ← 展开状态显式带回来
+      else if (cfgBlocks.has(b.id)) { const wrap = document.createElement('div'); wrap.innerHTML = cfgBlocks.get(b.id); const d = wrap.firstElementChild; if (d) c.appendChild(d); }
+      else c.insertAdjacentHTML('beforeend', '<p class="hint">读取配置中…</p>');
+      const d = c.querySelector('details.botcfg');
+      if (d && !d.dataset.cfgWired) { d.dataset.cfgWired = '1'; queueMicrotask(wireBotCfgBlocks); }
+    }
+    box.appendChild(c);
+  }
+  box.querySelectorAll('[data-restart]').forEach(b => b.onclick = async () => {
+    b.disabled = true; b.textContent = '重启中…';
+    await post('/api/bots/' + encodeURIComponent(b.dataset.restart) + '/restart');
+    setTimeout(refresh, 1500);
+  });
+  box.querySelectorAll('[data-kick]').forEach(b => b.onclick = async () => {
+    b.disabled = true; b.textContent = '已断开…';
+    const r = await post('/api/bots/' + encodeURIComponent(b.dataset.kick) + '/kick');
+    b.textContent = r.ok ? '已断开…' : (r.error || '不行');
+    setTimeout(() => { b.disabled = false; b.textContent = '断开重连'; refresh(); }, 6000);
+  });
+  box.querySelectorAll('[data-logs]').forEach(b => b.onclick = async () => {
+    const pre = document.getElementById('log-' + b.dataset.logs);
+    if (pre.style.display !== 'none') { pre.style.display = 'none'; return; }
+    const r = await api('/api/logs?bot=' + encodeURIComponent(b.dataset.logs) + '&tail=150');
+    pre.textContent = r.lines || '（还没有日志）';
+    pre.style.display = 'block';
+  });
+  box.querySelectorAll('[data-prof]').forEach(b => b.onclick = () => loadProfile(b.dataset.prof, true));
+  for (const b of bots) loadProfile(b.id, false);
+
+  // 技术细节：折叠起来，别摆在脸上
+  if (host) {
+    const t = [];
+    t.push(['到 QQ 网关的连接', host.qqConn > 0 ? '✅ ' + host.qqConn + ' 条' : '⚠️ 暂时没有（可能在重连）']);
+    t.push(['进程数', (host.appCount===1?'✅':'❌') + ' 应用 ' + host.appCount + ' 个 · ' + (host.supervisor.count===1?'✅':'⚠️') + ' 守护 ' + host.supervisor.count + ' 个']);
+    t.push(['内存 / 心跳', host.app.rssMB + ' MB · ' + host.app.heartbeatAgeSec + ' 秒前']);
+    t.push(['计划任务', host.tasks.map(x => esc(x.name) + '=' + esc(x.status)).join(' · ')]);
+    t.push(['配置文件', '<span class="hint">' + esc(host.configPath) + '</span>']);
+    let lanes = '';
+    for (const b of bots) {
+      const q = b.queue || {};
+      if ((q.lanes||[]).length) lanes += `<table><tr><th>${esc(b.id)} · 对话</th><th>处理中</th><th>排队</th><th>已跑</th></tr>`
+        + q.lanes.map(l => `<tr><td>${esc(l.peer)}</td><td>${l.busy?'是':'—'}</td><td>${l.depth}</td><td>${l.activeSec}s</td></tr>`).join('') + '</table>';
+    }
+    t.push(['模型调用', bots.map(b => `${esc(b.id)}：${b.modelCalls} 次 · 平均 ${b.modelCalls?Math.round(b.modelMsTotal/b.modelCalls/100)/10:0} 秒 · tokens ${b.tokensTotal}`).join('<br>')]);
+    t.push(['被跳过/挡下', bots.map(b => `${esc(b.id)}：共 ${b.skipped}（重复 ${b.duplicates} · 限流 ${b.rateLimited} · 自身回声 ${b.selfEcho}）`).join('<br>')]);
+    $('#tech').innerHTML = '<dl class="kv">' + t.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') + '</dl>' + lanes
+  { const s = document.getElementById('techSum'); if (s) s.textContent = (host && host.notes && host.notes.length) ? '⚠ ' + host.notes.length : '✓'; }
+      + (ns.length ? ns.map(n => `<p class="${n.level === 'warn' ? 'note' : 'hint'}">${n.level === 'warn' ? '⚠️ ' : '· '}${esc(n.text)}</p>`).join('') : '');
+  }
+
+  renderForm(st);
+  buildCred();
+}
+
+/* ── 机器人资料：平台怎么认这个机器人（名字/头像只能读，改不了） ──
+ * 老板要求"常驻显示"：所以顶部状态条里永远挂着头像+名字，
+ * 而且**刷新失败不清空**（保留上一次的并标明多久前更新的）—— 空白会让人以为机器人没了。 */
+const profById = {};                 // 每个机器人的资料（内存里一份，页面刷新后由服务端存盘那份立即回填）
+let profTimer = null;
+
+function renderHeroProfile() {
+  const box = $('#heroProf');
+  if (!box) return;
+  const ids = Object.keys(profById);
+  if (!ids.length) { box.innerHTML = '<span class="hint">正在取平台资料…</span>'; return; }
+  box.innerHTML = ids.map((id) => {
+    const p = profById[id];
+    const stale = p.stale ? ` · <span class="badmsg">平台连不上，显示 ${ago(Math.round((Date.now()-p.cachedAt)/1000))}的</span>` : '';
+    return `<span class="hprof">
+      ${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : '<span class="avph"></span>'}
+      <span><b>${esc(p.platformName)}</b> <span class="hint">${esc(p.appIdShown || p.appIdMasked)}${stale}</span></span>
+    </span>`;
+  }).join('');
+}
+
+async function loadProfile(botId, force) {
+  const r = await api('/api/bots/' + encodeURIComponent(botId) + '/profile' + (force ? '?force=1' : ''));
+  const box = document.getElementById('prof-' + botId);
+  // 第一个机器人的资料详情放"状态"页（侧栏品牌也跟着它）
+  const detail = document.getElementById('profDetail');
+  const brandName = document.getElementById('brandName');
+  const brandIcon = document.getElementById('brandIcon');
+  if (!r.ok) {
+    // 失败**不动**已显示的内容（有旧的就留着），只加一句说明
+    if (profById[botId]) { profById[botId].stale = true; renderHeroProfile(); return; }
+    if (box) box.innerHTML = '<span class="hint">' + esc(r.error || '读不到资料') + '</span>';
+    return;
+  }
+  profById[botId] = r;
+  const nameEl = document.getElementById('pn-' + botId);
+  if (nameEl && r.alias) nameEl.textContent = r.alias;
+  renderHeroProfile();
+  if (box) {
+    // 卡片里只留"头像 + 平台名字"，下面那行小字全是解释 → 已经收进标题旁边的问号
+    box.innerHTML = r.avatar
+      ? `<div style="display:flex;gap:10px;align-items:center;margin:4px 0 0">
+           <img src="${esc(r.avatar)}" alt="" style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line)">
+           <span class="line">平台名 <b>${esc(r.platformName)}</b></span></div>`
+      : '';
+  }
+  // 状态页的资料详情 + 侧栏品牌（都跟着机器人本人走）
+  if (detail && !Object.keys(profById).some((k) => k !== botId)) {
+    detail.innerHTML = `<dl class="kv">
+      <dt>平台名</dt><dd><b>${esc(r.platformName)}</b></dd>
+      <dt>appId</dt><dd>${esc(r.appIdShown || r.appIdMasked)}</dd>
+      <dt>appSecret</dt><dd>${r.secretMasked && r.secretMasked !== '（空）' ? '已取到' : '—'}</dd>
+      <dt>来源</dt><dd>${esc(String(r.credentialsFrom || '').charAt(0) === '$' ? 'config\\secrets.json' : (r.credentialsFrom || '—'))}</dd>
+    </dl>`;
+  }
+  if (brandName && r.platformName) brandName.textContent = r.platformName.length > 12 ? 'BotHub' : r.platformName;
+  if (brandIcon && r.avatar) { brandIcon.src = r.avatar; brandIcon.hidden = false; }
+  // 应用窗口的标题和图标也跟着用机器人自己的 —— 这样"资料"在任务栏上也常驻
+  if (r.platformName) document.title = 'BotHub · ' + r.platformName;
+  if (r.avatar) {
+    let link = document.querySelector('link[rel="icon"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    if (link.href !== r.avatar) link.href = r.avatar;
+  }
+}
+
+/* ── 凭据：设置/轮换 QQ appId + appSecret（值只往文件里写，不回显、不经过我） ── */
+let credBuilt = false;
+async function buildCred(){
+  const st = lastStatus; if (!st || credBuilt) return;
+  const box = $('#cred'); if (!box) return;
+  let html = '';
+  for (const b of st.bots) {
+    const r = await api('/api/bots/' + encodeURIComponent(b.id) + '/profile');
+    html += `
+      <div class="card soft">
+        <h3>${esc(b.alias || b.id)} <span class="tag">${esc(b.id)}</span></h3>
+        <div class="line">appId <b>${esc(r.appIdShown || '—')}</b> · appSecret <b>${r.secretMasked && r.secretMasked !== '（空）' ? '已取到' : '—'}</b></div>
+        <div class="grid2" style="margin-top:10px">
+          <label class="f"><span>新的 appId </span><input id="cid-${esc(b.id)}" placeholder="不改就留空"></label>
+          <label class="f"><span>新的 appSecret </span><input id="csec-${esc(b.id)}" type="password" placeholder="粘贴新的 AppSecret" autocomplete="off"></label>
+        </div>
+        <div class="row"><button class="primary" data-cred="${esc(b.id)}">保存并验证</button>
+        <span class="hint" id="cmsg-${esc(b.id)}"></span></div>
+      </div>`;
+  }
+  box.innerHTML = html;
+  box.querySelectorAll('[data-cred]').forEach(btn => btn.onclick = async () => {
+    const id = btn.dataset.cred;
+    const sec = document.getElementById('csec-' + id).value.trim();
+    const aid = document.getElementById('cid-' + id).value.trim();
+    const msg = document.getElementById('cmsg-' + id);
+    if (!sec) { msg.innerHTML = '<span class="badmsg">appSecret 没填</span>'; return; }
+    btn.disabled = true; btn.textContent = '验证中…'; msg.textContent = '';
+    const r = await post('/api/bots/' + encodeURIComponent(id) + '/credentials', { appId: aid, appSecret: sec });
+    document.getElementById('csec-' + id).value = '';
+    btn.disabled = false; btn.textContent = '保存并验证';
+    msg.innerHTML = r.ok ? '<span class="okmsg">✅ ' + esc(r.note || '已保存') + '</span>'
+                         : '<span class="badmsg">❌ ' + esc(r.error || '失败') + '</span>';
+    if (r.ok) { credBuilt = false; setTimeout(() => { buildCred(); refresh(); }, 1500); }
+  });
+  credBuilt = true;
+}
+
+/**
+ * ── 维护：会话上下文 / 后台内存 / 数据占用 ──
+ * 统计要遍历目录（浏览器 profile 几百 MB），所以**展开时才去取**，不跟着 5 秒刷新跑。
+ */
+let maintLoaded = false;
+/** 公开配置的模块级缓存（模板里不能用 refresh() 的局部 pub） */
+let PUB = null;
+/** 维护对象（哪些机器人参与维护）；null = 没选过 → 默认全选 */
+let maintSel = null;
+let maintMsg = '';   // 操作结果要留得住（否则重新统计时被冲掉，看着像没反应）
+async function renderMaint(force = false) {
+  const box = document.getElementById('maint');
+  if (!box) return;
+  if (maintLoaded && !force) return;
+  box.innerHTML = '<span class="hint">统计中…</span>';
+  const m = await api('/api/maintenance');
+  if (!m || !m.memory) { box.innerHTML = '<span class="hint">取不到维护信息</span>'; return; }
+  maintLoaded = true;
+  const kb = (b) => (b < 1024 * 1024 ? Math.round(b / 1024) + ' KB' : (b / 1048576).toFixed(1) + ' MB');
+  /**
+   * 维护对象：哪些机器人要参与（老板要的"维护的是哪个机器人要能选，也可以一键多选"）。
+   * `maintSel` 为 null = 没选过 → 默认**全选**；用户改过之后就记住他选的。
+   */
+  const allIds = (m.sessions.perBot || []).map((x) => x.bot);
+  if (maintSel === null) maintSel = new Set(allIds);
+  for (const id of [...maintSel]) if (!allIds.includes(id)) maintSel.delete(id);          // 机器人被删了就移出
+  const selIds = allIds.filter((id) => maintSel.has(id));
+  const picker = allIds.length ? `
+    <div class="line" style="margin-bottom:8px">维护对象
+      <button class="ghost" data-pick="all" style="margin-left:8px">全选</button>
+      <button class="ghost" data-pick="none">全不选</button>
+    </div>
+    <div class="btns" style="gap:8px;margin-bottom:10px">
+      ${allIds.map((id) => `<label class="picksel${maintSel.has(id) ? ' on' : ''}">
+        <input type="checkbox" data-pick-id="${esc(id)}" ${maintSel.has(id) ? 'checked' : ''}>${esc(id)}</label>`).join('')}
+    </div>` : '';
+  const rows = (m.sessions.perBot || []).map((x) => {
+    const top = (x.top || []).slice(0, 3).map((p) => `${esc(p.peer)}（${p.lines} 条）`).join('、');
+    const off = !maintSel.has(x.bot);
+    return `<div class="line" style="${off ? 'opacity:.45' : ''}">${esc(x.bot)}：<b>${x.peers}</b> 个对话 · <b>${x.lines}</b> 条 · ${kb(x.bytes)}${top ? `　<span class="hint">${top}</span>` : ''}</div>`;
+  }).join('');
+  box.innerHTML = `
+    ${picker}
+    <div class="line">内存 <b>${m.memory.rssMB} MB</b> · 已运行 <b>${Math.round(m.memory.uptimeSec / 60)}</b> 分钟
+      · 会话 <b>${m.sessions.files}</b> 个文件 / <b>${kb(m.sessions.bytes)}</b>
+      · 日志 <b>${m.data.logsFiles}</b> 个 / <b>${kb(m.data.logsBytes)}</b>
+      · 浏览器缓存 <b>${kb(m.data.edgeBytes)}</b></div>
+    <div class="btns">
+      <button class="act" data-m="compact">压缩会话${selIds.length && selIds.length < allIds.length ? `（${selIds.length} 个）` : ''}</button>
+      <button class="ghost" data-m="clear">清空会话${selIds.length && selIds.length < allIds.length ? `（${selIds.length} 个）` : ''}</button>
+      <button class="act" data-m="gc" title="整个软件">释放内存</button>
+      <button class="act" data-m="logs" title="整个软件">清理日志</button>
+      <button class="act" data-m="cache" title="整个软件">清缓存</button>
+    </div>
+    <div class="line" id="maintmsg" style="margin-top:8px">${maintMsg}</div>
+    ${rows ? '<div class="body" style="border-top:1px solid var(--line);margin-top:12px">' + rows + '</div>' : ''}`;
+  // 选择区交互（改完记住选择，会话类动作只作用于选中的）
+  box.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
+    if (b.dataset.pick === 'all') maintSel = new Set(allIds); else maintSel = new Set();
+    renderMaint(true);
+  });
+  box.querySelectorAll('[data-pick-id]').forEach(cb => cb.onchange = () => {
+    if (cb.checked) maintSel.add(cb.dataset.pickId); else maintSel.delete(cb.dataset.pickId);
+    renderMaint(true);
+  });
+  box.querySelectorAll('[data-m]').forEach(btn => btn.onclick = async () => {
+    const what = btn.dataset.m;
+    const picked = maintSel ? [...maintSel] : [];
+    // 会话类动作**只作用于选中的机器人**；内存/日志/缓存是"整个软件"级别的，选了也没用
+    const perBot = what === 'compact' || what === 'clear';
+    if (perBot && !picked.length) { document.getElementById('maintmsg').innerHTML = '<span class="badmsg">先选至少一个机器人（上面「维护对象」）</span>'; return; }
+    if (what === 'clear' && !confirm(picked.length < allIds.length ? `清空选中的 ${picked.length} 个机器人的对话历史？不可撤销。` : '清空全部机器人的对话历史？不可撤销。')) return;
+    if (what === 'compact' && !confirm(picked.length < allIds.length ? `压缩选中的 ${picked.length} 个机器人的对话历史？` : '压缩全部机器人的对话历史？')) return;
+    const msg = document.getElementById('maintmsg');
+    btn.disabled = true; msg.textContent = '处理中…';
+    const mapPath = { gc: 'gc', compact: 'sessions/compact', clear: 'sessions/clear', logs: 'logs/prune', cache: 'browser/clear' };
+    const body = what === 'compact' ? { keepTurns: 6, bots: picked }
+      : what === 'clear' ? { bots: picked }
+      : what === 'logs' ? { days: 7 } : {};
+    const r = await post('/api/maintenance/' + mapPath[what], body);
+    btn.disabled = false;
+    msg.innerHTML = r.ok ? '<span class="okmsg">✅ ' + esc(r.note || '完成') + '</span>'
+                         : '<span class="badmsg">❌ ' + esc(r.error || '失败') + '</span>';
+    if (what === 'gc' && r.ok) msg.innerHTML = `<span class="okmsg">✅ ${esc(r.note)}（${r.beforeMB} → ${r.afterMB} MB）</span>`;
+    maintMsg = msg.innerHTML;      // 留得住：重新统计时也显示（否则点完看着像没反应）
+    maintLoaded = false;
+    setTimeout(() => renderMaint(true), 900);
+  });
+}
+
+let cfgLoaded = false, cfgRaw = '', cfgLoadedAt = 0;
+/** 每个机器人的配置块 HTML（机器人页用；刷新时"搬节点"而不是重建） */
+const cfgBlocks = new Map();
+function renderForm(st){
+  if (cfgLoaded) return;
+  const _cm = document.getElementById('cfgmsg'); if (_cm) _cm.textContent = '正在读取配置…';
+  loadCfg();
+}
+/**
+ * 给"配置下拉"接线：填指令行、挂开关、把模型清单塞进 datalist。
+ *
+ * ⛔ 为什么必须**在块挂进 DOM 之后**才能跑：这些元素（`#cmds-i` / `#ml-i`）是配置块里的，
+ *    配置块由 renderBots 挂到机器人卡上；loadCfg 只是**生成 HTML 字符串**，那会儿 DOM 里还没有它们 ——
+ *    第一版把这段留在 loadCfg 里，于是"指令行是空的、模型下拉没有候选项"（实测 formReady 为真但 cmdSwitches=0）。
+ * 用一个 `dataset.cfgWired` 标记，避免每 5 秒重画时重复接线。
+ */
+function wireBotCfgBlocks() {
+// ── 自定义指令的编辑器：每条指令一行（名字 / 动作 / 内容 / 说明） ──
+const cmdKinds = [
+  ['reply', '回一句固定话'],
+  ['prompt', '问模型（带提示词）'],
+  ['status', '报告它的状态'],
+  ['logs', '最近 10 行日志'],
+  ['restart', '重启它自己'],
+];
+const cmdRowHtml = (c) => {
+  const kind = c.action ? c.action : (c.prompt ? 'prompt' : 'reply');
+  const value = c.reply || c.prompt || '';
+  const on = c.enabled !== false;
+  return `
+    <div class="cmdrow${on ? '' : ' off'}">
+      <label class="sw" title="开=生效；关=临时停用（配置还留着，随时开回来）">
+        <input type="checkbox" data-c="enabled" ${on ? 'checked' : ''}><i></i></label>
+      <input data-c="name" value="${esc(c.name || '')}" placeholder="/指令名">
+      <select data-c="kind">${cmdKinds.map(([v, t]) => `<option value="${v}" ${v === kind ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <input data-c="desc" value="${esc(c.desc || '')}" placeholder="说明（/帮助 里显示）">
+      <button class="ghost" type="button" data-delcmd>删</button>
+      <input data-c="value" value="${esc(value)}" placeholder="要回的话 / 给模型的提示词">
+    </div>`;
+};
+const cfgBots = (JSON.parse(cfgRaw).bots) || [];
+for (let i = 0; i < cfgBots.length; i++) {
+  const box = document.getElementById('cmds-' + i);
+  if (!box) continue;
+  box.dataset.i = String(i);
+  box.innerHTML = (cfgBots[i].commands || []).map(cmdRowHtml).join('');
+}
+// 开关一拨就让那行变灰（立刻看得出"这条现在是停用的"，不用等保存）
+const wireCmdSwitches = (root) => root.querySelectorAll('.cmdrow [data-c="enabled"]').forEach(sw => {
+  sw.onchange = () => sw.closest('.cmdrow').classList.toggle('off', !sw.checked);
+});
+wireCmdSwitches(document);
+/**
+ * 模型选项：拉这个机器人能用的模型，塞进 datalist（可下拉选、也可手填）。
+ * 列表来自 DSH 自己的配置（他装了什么插件、有什么免费模型，这里就有什么）或 openai 通道的 /models。
+ */
+for (let i = 0; i < cfgBots.length; i++) {
+  (async () => {
+    const dl = document.getElementById('ml-' + i);
+    if (!dl) return;
+    const m = await api('/api/models?bot=' + encodeURIComponent(cfgBots[i].id));
+    const opts = [];
+    const provs = new Set();
+    for (const p of (m.providers || [])) {
+      provs.add(p.id);
+      for (const id of (p.models || [])) opts.push({ v: id, label: `${p.displayName || p.id} · ${id}` });
+    }
+    if (m.openai) for (const id of (m.openai.models || [])) opts.push({ v: id, label: `${m.openai.channel} · ${id}` });
+    dl.innerHTML = opts.map((o) => `<option value="${esc(o.v)}">${esc(o.label)}</option>`).join('');
+    const pv = document.getElementById('pv-' + i);
+    if (pv) pv.innerHTML = [...provs].map((p) => `<option value="${esc(p)}"></option>`).join('');
+  })();
+}
+document.querySelectorAll('.botcfg [data-addcmd]').forEach(btn => btn.onclick = () => {
+  const box = document.getElementById('cmds-' + btn.dataset.addcmd);
+  box.insertAdjacentHTML('beforeend', cmdRowHtml({ name: '/', desc: '' }));
+  wireCmdSwitches(box);
+});
+}
+
+async function loadCfg(){
+  const r = await api('/api/config/raw');
+  cfgRaw = r.text || '';
+  $('#cfgpath').textContent = '文件：' + (r.path || '');
+  $('#cfgtext').value = cfgRaw;
+  let cfg = null; try { cfg = JSON.parse(cfgRaw); } catch {}
+  if (!cfg) {
+    // 配置文件读不出来：机器人页会显示提示，这里只在维护页的高级编辑里说一句
+    $('#cfgmsg').innerHTML = '<span class="badmsg">配置文件不是合法 JSON —— 用这个编辑框修好再保存</span>';
+    cfgLoaded = true; cfgLoadedAt = Date.now(); return;
+  }
+  const bots = cfg.bots || [];
+  const chans = (cfg.channels || []).map(c => c.id);
+  /**
+   * 每个机器人的配置块（**放在「机器人」页那张卡里、做实心下拉**；老板要求）。
+   * ⚠️ 生成好先缓存进 `cfgBlocks`，由 renderBots 挂到对应机器人卡上 ——
+   *    因为 refresh() 每 5 秒重画一次机器人卡，**不能每次重建表单**（会把正在填的内容冲掉）。
+   */
+  cfgBlocks.clear();
+  bots.forEach((b, i) => cfgBlocks.set(b.id, `
+    <details class="botcfg" data-cfgbot="${esc(b.id)}">
+      <summary>配置 <span class="hint">人格 / 模型 / 权限 / 指令</span></summary>
+      <div class="body">
+      <div class="grid2">
+        <label class="f"><span>显示名 ${qBtn('botBase')}</span>
+          <input data-i="${i}" data-k="alias" value="${esc(b.alias || b.id)}"></label>
+        <label class="f"><span>人格提示词</span>
+          <textarea data-i="${i}" data-k="persona" placeholder="它是谁、怎么说话（留空＝默认）">${esc(b.persona || '')}</textarea></label>
+      </div>
+      <!-- 块小标题：跨整行（不放进 grid2 里，否则会被挤进左边那个单元格） -->
+      <div class="sechead">模型与权限 ${qBtn('botModel')}</div>
+      <div class="grid2">
+        <!-- 老板要的：每个机器人可以在**自己的配置里**选凭据 -->
+        <label class="f"><span>用哪个凭据</span>
+          <select data-i="${i}" data-k="credential">${credOptions(b, PUB)}</select></label>
+        <label class="f"><span>模型通道</span>
+          <select data-i="${i}" data-k="channel">${chans.map(c => `<option ${c===b.channel?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+        <label class="f"><span>模型</span>
+          <input data-i="${i}" data-k="model" list="ml-${i}" value="${esc(b.model || '')}" placeholder="留空＝跟随 DSH（插件自动轮切）">
+          <datalist id="ml-${i}"></datalist></label>
+      </div>
+      <div class="grid2">
+        <label class="f"><span>供应商</span>
+          <input data-i="${i}" data-k="provider" list="pv-${i}" value="${esc(b.provider || '')}" placeholder="跟随默认">
+          <datalist id="pv-${i}"></datalist></label>
+        <label class="f"><span>推理等级</span>
+          <select data-i="${i}" data-k="reasoningEffort">
+            <option value="" ${!b.reasoningEffort ? 'selected' : ''}>跟随 DSH</option>
+            <option value="low" ${b.reasoningEffort === 'low' ? 'selected' : ''}>低（快、省）</option>
+            <option value="medium" ${b.reasoningEffort === 'medium' ? 'selected' : ''}>中</option>
+            <option value="high" ${b.reasoningEffort === 'high' ? 'selected' : ''}>高（慢、想得多）</option>
+          </select></label>
+        <label class="f"><span>操作权限</span>
+          <select data-i="${i}" data-k="permission">
+            <option value="" ${!b.permission ? 'selected' : ''}>跟随 DSH</option>
+            <option value="read-only" ${b.permission === 'read-only' ? 'selected' : ''}>只读（看得到、改不了）</option>
+            <option value="workspace-write" ${b.permission === 'workspace-write' ? 'selected' : ''}>可改工作目录（推荐）</option>
+            <option value="danger-full-access" ${b.permission === 'danger-full-access' ? 'selected' : ''}>完全放开（慎用）</option>
+          </select></label>
+        <label class="f"><span>只聊天</span>
+          <select data-i="${i}" data-k="noTools">
+            <option value="false" ${!b.noTools ? 'selected' : ''}>不 —— 允许它动手（用工具）</option>
+            <option value="true" ${b.noTools ? 'selected' : ''}>是 —— 只说话，不给工具</option>
+          </select></label>
+      </div>
+      <div class="grid2">
+        <label class="f"><span>群里必须 @ 它</span>
+          <select data-i="${i}" data-k="mentionRequired">
+            <option value="true" ${b.mentionRequired!==false?'selected':''}>是</option>
+            <option value="false" ${b.mentionRequired===false?'selected':''}>不用 @</option>
+          </select></label>
+        <label class="f"><span>每分钟最多</span>
+          <input data-i="${i}" data-k="limits.perPeerPerMin" value="${(b.limits && b.limits.perPeerPerMin) || 8}"></label>
+      </div>
+      <label class="f"><span>自定义指令</span></label>
+      <div id="cmds-${i}" class="cmds"></div>
+      <div class="row" style="margin:0 0 12px">
+        <button class="ghost" type="button" data-addcmd="${i}">+ 加一条</button>
+      </div>
+      <label class="f"><span>最长处理（秒）</span>
+        <input data-i="${i}" data-k="queue.maxProcessingMs" value="${Math.round(((b.queue && b.queue.maxProcessingMs) || 300000)/1000)}"></label>
+      <div class="row">
+        <button class="primary" type="button" data-savebot="${esc(b.id)}">保存</button>
+        <span class="hint" data-savemsg="${esc(b.id)}"></span>
+      </div>
+      </div>
+    </details>`));
+
+  document.addEventListener('click', (ev) => {
+    const del = ev.target.closest('[data-delcmd]');
+    if (del) del.closest('.cmdrow').remove();
+    /**
+     * 保存按钮是**每个机器人一个**（`data-savebot`）→ 用委托，省得每次重画都重新绑。
+     * ⛔ 第一版这段塞在 loadCfg() 里面，而且我用的写入位置没生效 —— 结果"按钮在、点了没反应、
+     *    提示栏一直空着"。现在放在**模块级**（脚本加载就绑好，跟配置读没读进来无关）。
+     */
+    const saveBtn = ev.target.closest('[data-savebot]');
+    if (saveBtn && typeof saveAllBots === 'function') saveAllBots(saveBtn);
+  });
+
+
+  cfgLoaded = true;
+}
+
+/**
+ * 保存：**每个机器人一个按钮**（`data-savebot`），用委托，省得每次重画都重新绑。
+ * 一次保存会写**所有机器人**（所有配置字段都在 DOM 里，哪怕下拉是收着的），
+ * 结果只写回**点的那张卡**上（`data-savemsg`），别让别的卡跟着闪。
+ */
+async function saveAllBots(btn) {
+  const msg = btn.parentElement.querySelector('[data-savemsg]') || btn.nextElementSibling;
+  const show = (html) => { if (msg) msg.innerHTML = html; };
+  /**
+   * 保存反馈的小组件（老板点名要的）：
+   *   · 保存中 → 一个**转圈的点线圆** +「正在保存喵~」
+   *   · 成功   → 小勾 +「保存成功，快去重启吧喵~」
+   *   · 失败   → 小叉 +「保存失败，再试一次吧喵~」
+   * 三种都**显示 2 秒后淡淡消失**（先加 .show 渐显，2 秒后撤掉 .show 让它淡出，再清空 DOM）。
+   */
+  let saveFadeTimer = null, saveClearTimer = null;
+  function setSaveState(el, kind, detail) {
+    if (!el) return;
+    clearTimeout(saveFadeTimer); clearTimeout(saveClearTimer);
+    el.classList.remove('fade');
+    const html = kind === 'saving'
+      ? '<span class="dotted-spin"></span>正在保存喵~'
+      : kind === 'ok'
+        ? '<span class="mark ok">✓</span>保存成功，快去重启吧喵~'
+        : '<span class="mark bad">✕</span>保存失败，再试一次吧喵~' + (detail ? `（${esc(detail)}）` : '');
+    el.innerHTML = html;
+    el.classList.toggle('bad', kind === 'bad');
+    // 强制重排一次，保证"先渐显"的过渡真的跑起来
+    void el.offsetWidth;
+    el.classList.add('show');
+    if (kind === 'saving') return;                 // 转圈状态一直留着，直到有结果
+    saveFadeTimer = setTimeout(() => el.classList.add('fade'), 2000);      // 2 秒后开始淡出
+    saveClearTimer = setTimeout(() => { if (el.classList.contains('fade')) el.innerHTML = ''; el.classList.remove('show'); }, 3000);
+  }
+  /**
+   * ⛔ **底稿必须重新问服务端要**（2026-10-15 修，真踩到了）：
+   *    原来拿页面里那份 `#cfgtext` 当底稿 —— 如果这个页面是**几分钟前打开的**，它手里是旧配置；
+   *    一点保存就把**别处已经改好的东西覆盖回去**
+   *    （实测：老板机器人的通道被一个旧标签页的保存改回了 dsh-local）。
+   *    现在的规则：以**服务端此刻的配置**为底，只把这张表单上的字段盖上去。
+   */
+  let cfg2;
+  try {
+    const fresh = await api('/api/config/raw');
+    cfg2 = JSON.parse(fresh.text || '{}');
+    $('#cfgtext').value = fresh.text || '';      // 顺手把维护页那份也更新掉
+  } catch {
+    show('<span class="badmsg">读不到当前配置（应用可能在重启）—— 等一下再点保存</span>');
+    return;
+  }
+  btn.disabled = true; btn.textContent = '保存中…';
+  setSaveState(msg, 'saving');
+  // ① 普通字段（配置块的容器现在是 .botcfg，不再是 #form）
+  document.querySelectorAll('.botcfg [data-k]').forEach(el => {
+    const i = Number(el.dataset.i), k = el.dataset.k;
+    let v = el.value;
+    if (k === 'mentionRequired' || k === 'noTools') v = (v === 'true');
+    if (k === 'limits.perPeerPerMin') { cfg2.bots[i].limits = cfg2.bots[i].limits || {}; cfg2.bots[i].limits.perPeerPerMin = Number(v) || 8; return; }
+    if (k === 'queue.maxProcessingMs') { cfg2.bots[i].queue = cfg2.bots[i].queue || {}; cfg2.bots[i].queue.maxProcessingMs = (Number(v) || 300) * 1000; return; }
+    cfg2.bots[i][k] = v;
+  });
+  // ② 指令：从每条指令那几行输入里收集（空名字的直接丢掉）
+  document.querySelectorAll('.botcfg .cmds').forEach(box => {
+    const i = Number(box.dataset.i);
+    if (!cfg2.bots[i]) return;
+    const list = [];
+    box.querySelectorAll('.cmdrow').forEach(row => {
+      const name = row.querySelector('[data-c="name"]').value.trim();
+      if (!name) return;
+      const kind = row.querySelector('[data-c="kind"]').value;
+      const val = row.querySelector('[data-c="value"]').value;
+      const desc = row.querySelector('[data-c="desc"]').value.trim();
+      const on = row.querySelector('[data-c="enabled"]').checked;   // 指令后面的开关：关=停用
+      const c = { name, desc, enabled: on };
+      if (kind === 'reply') c.reply = val;
+      else if (kind === 'prompt') c.prompt = val;
+      else c.action = kind;              // status | restart | logs | help
+      list.push(c);
+    });
+    cfg2.bots[i].commands = list;
+  });
+  const text = JSON.stringify(cfg2, null, 2);
+  $('#cfgtext').value = text;
+  const r = await post('/api/config/raw', { text });
+  btn.disabled = false; btn.textContent = '保存';
+  /**
+   * 老板要的反馈：保存中 = 转圈的点线圆 +「正在保存喵~」；
+   * 成功 = 小勾 +「保存成功，快去重启吧喵~」；失败 = 小叉 +「保存失败，再试一次吧喵~」；
+   * **不管哪种，2 秒后淡淡消失**（用 CSS 过渡降透明度，不是硬切）。
+   */
+  setSaveState(msg, r.ok ? 'ok' : 'bad', r.ok ? null : String(r.error || '').split('\n')[0]);
+}
+
+/* ── 按钮 ── */
+$('#restartapp').onclick = async (e) => {
+  if (!confirm('重启应用？机器人会断几秒，看护进程几秒内把它拉起来。')) return;
+  const btn = e.target;
+  btn.disabled = true;
+  /**
+   * ⛔ 老板要求：点重启**只重启**，不要"跳到别的页面区域"。
+   *    原来这里一恢复就 `location.reload()` —— 页面重载会把滚动位置和当前页都重置（看着像"跳走了"）。
+   *    现在**不重载**：每秒问一次"回来了吗"，回来了就地把状态写回去、再刷一次数据即可
+   *    （面板本来就是每 5 秒自己刷新的，页面不动才是对的）。
+   */
+  let waited = 0;
+  const tickWait = setInterval(() => {
+    waited += 1;
+    btn.textContent = `正在重启…已等 ${waited} 秒`;
+    setRebootMsg(`正在重启（机器人会断几秒），已等 ${waited} 秒…`);
+  }, 1000);
+  try { await post('/api/app/restart'); } catch { /* 它可能已经先断了，正常 */ }
+  for (let i = 0; i < 90; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    try {
+      const r = await fetch('/api/health', { cache: 'no-store' });
+      if (r.ok || r.status === 503) {
+        clearInterval(tickWait);
+        btn.disabled = false; btn.textContent = '重启应用';
+        setRebootMsg(`✅ 已经回来了（等了 ${waited} 秒）`);
+        try { await refresh(); } catch { /* 刷新失败也没关系，5 秒后自己会刷 */ }
+        return;                       // ← 就地结束，**不重载页面**
+      }
+    } catch { /* 还没回来 */ }
+  }
+  clearInterval(tickWait);
+  btn.disabled = false; btn.textContent = '重启应用';
+  setRebootMsg('等了 90 秒还没回来 —— 双击 check-bothub.cmd 看诊断');
+};
+$('#cfgsave').onclick = async () => {
+  $('#cfgmsg').textContent = '保存中…';
+  const r = await post('/api/config/raw', { text: $('#cfgtext').value });
+  $('#cfgmsg').innerHTML = r.ok ? '<span class="okmsg">✅ 已保存并通过校验（点「重启应用」生效）</span>'
+                                : '<span class="badmsg">❌ ' + esc(String(r.error||'')).replace(/\n/g,'<br>') + '</span>';
+  if (r.ok) { cfgLoaded = false; loadCfg(); }
+};
+$('#cfgreset').onclick = async () => { cfgLoaded = false; await loadCfg(); $('#cfgmsg').textContent = '已放弃改动'; };
+if (location.protocol === 'http:' && location.hostname === '127.0.0.1' && !navigator.userAgent.includes('Edg/')) $('#openpage').hidden = false;
+$('#openpage').onclick = () => window.open(location.href, '_blank');
+
+refresh();
+setInterval(refresh, 5000);
+  // 第一次打开（或还没配凭据）→ 弹向导
+  maybeShowWelcome(false);
+
+/**
+ * 左侧导航切页（参考成熟软件的做法：分页而不是一条长滚动）。
+ * 维护页要遍历目录（浏览器 profile 几百 MB），所以**切到维护页才统计**，不跟着 5 秒刷新跑。
+ */
+/** 每一页的**大标题** + 一句说明（老板要的"每个分类的页面都有大标题"） */
+const PAGES = {
+  status: ['状态', ''],
+  bots: ['机器人', ''],
+  maint: ['维护', ''],
+  settings: ['设置', ''],
+};
+function showView(name) {
+  const pg = PAGES[name] || PAGES.status;
+  const tEl = document.getElementById('pageTitle');
+  /**
+   * 大标题 + 旁边的「?」。老板要求：大标题下面**不要挂小字**（副标题去年掉了），
+   * 所以"这一页怎么用"的说明只留一个「?」，挂在大标题右边（维护页原来还有个重复的小标题，也删了）。
+   */
+  if (tEl) {
+    tEl.innerHTML = esc(pg[0]) + '<span id="pageHelp"></span>';
+    const k = { status: null, bots: null, maint: 'maintAll', settings: null }[name];
+    if (k) document.getElementById('pageHelp').innerHTML = qBtn(k);
+  }
+  // ⛔ 防陈旧表单：这一页若拿着 30 秒前的配置副本，一保存就会把别处的新改动盖回去
+  if (name === 'bots' && cfgLoaded && Date.now() - cfgLoadedAt > 30000) { cfgLoaded = false; try { loadCfg(); } catch { /* ignore */ } }
+  for (const a of document.querySelectorAll('#nav a')) a.classList.toggle('on', a.dataset.v === name);
+  for (const v of ['status', 'bots', 'maint', 'settings']) {
+    const el = document.getElementById('view-' + v);
+    if (el) el.hidden = (v !== name);
+  }
+  if (name === 'maint') renderMaint();
+  if (name === 'settings') renderForm(lastStatus);
+  try { location.hash = '#' + name; } catch { /* ignore */ }
+}
+for (const a of document.querySelectorAll('#nav a')) a.onclick = () => showView(a.dataset.v);
+showView((location.hash || '#status').slice(1));
+
+/**
+ * 资料自动刷新：每 10 分钟悄悄问一次平台（服务端也是 10 分钟缓存，所以几乎不花代价）。
+ * 为什么要有：老板要的是"常驻显示" —— 头像和名字不能只在打开页面那一刻对，
+ * 平台那边改了名字，页面不该一直显示旧的。
+ */
+setInterval(() => { for (const id of Object.keys(profById)) loadProfile(id, false); }, 10 * 60 * 1000);
+// 回到窗口时顺手刷一次（平时挂在后台，回来看到的就是新的）
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) for (const id of Object.keys(profById)) loadProfile(id, false);
+});
+
+/**
+ * ── 第一次打开的向导 ──
+ * 判据用**服务端的凭据状态**（不是 localStorage）：凭据没配好就该看到向导，
+ * 换台电脑、清了浏览器缓存也不会漏掉这一步。配好之后点「稍后再说」就不再烦。
+ *
+ * ⛔ 坑：弹窗的 HTML 写在 `<script>` **后面**（在 `</body>` 前），
+ *    所以脚本执行的那一刻 `#welcome` 还不存在 —— 直接调用/绑事件会**静默失效**
+ *    （第一版就是"手动调用有效、自动弹不出来"）。所有跟弹窗有关的动作都要等 DOM 就绪。
+ */
+/** ① 介绍（可爱、突出主题）② 环境需求 + 环境包 ③ 绑定 AppID/AppSecret */
+let wPage = 1;
+const W_TITLE = ['你好，我是 BotHub', '先确认电脑上有这些', '把机器人接上你的 QQ'];
+const W_SUB = ['让 QQ 机器人住在你自己的电脑上', '缺什么，环境包一键补齐', '只要 AppID 和 AppSecret 两个值'];
+function wRender() {
+  for (const s of document.querySelectorAll('#welcome .wpage')) s.hidden = Number(s.dataset.p) !== wPage;
+  document.getElementById('wTitle').textContent = W_TITLE[wPage - 1];
+  document.getElementById('wSub').textContent = W_SUB[wPage - 1];
+  document.getElementById('wDots').textContent = '● '.repeat(wPage) + '○ '.repeat(3 - wPage);
+  document.getElementById('wPrev').style.visibility = wPage === 1 ? 'hidden' : 'visible';
+  document.getElementById('wNext').textContent = wPage === 3 ? '保存并连接' : '下一步';
+}
+
+async function maybeShowWelcome(force) {
+  const box = document.getElementById('welcome');
+  if (!box) return;
+  if (!force && sessionStorage.getItem('bothub-welcomed') === '1') return;
+  let st;
+  try { st = await api('/api/status'); } catch { return; }
+  const b = (st.bots || [])[0];
+  if (!b) return;
+  if (b.credentialsReady && !force) return;      // 已经配好了 → 不打扰
+  document.getElementById('w-msg').textContent = '';
+  document.getElementById('w-appid').value = '';
+  document.getElementById('w-secret').value = '';
+  box.dataset.bot = b.id;
+  // 环境包地址：优先用 config/local.json 的 docsUrl（发布者填自己的仓库）
+  try {
+    const pref = await api('/api/prefs');
+    if (pref && pref.docsUrl) document.getElementById('wDownload').href = pref.docsUrl;
+  } catch { /* 用默认地址 */ }
+  wPage = 1; wRender();
+  box.hidden = false;
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('wPrev')?.addEventListener('click', () => { if (wPage > 1) { wPage--; wRender(); } });
+  document.getElementById('wNext')?.addEventListener('click', async () => {
+    if (wPage < 3) { wPage++; wRender(); return; }          // 前两页只是"翻页"
+    const btn = document.getElementById('wNext');           // 第三页才真的保存
+    const msg = document.getElementById('w-msg');
+    const id = document.getElementById('welcome').dataset.bot;
+    const appId = document.getElementById('w-appid').value.trim();
+    const appSecret = document.getElementById('w-secret').value.trim();
+    if (!appId || !appSecret) { msg.innerHTML = '<span class="badmsg">两个都要填</span>'; return; }
+    btn.disabled = true; btn.textContent = '正在连 QQ 验证…'; msg.textContent = '';
+    const r = await post('/api/bots/' + encodeURIComponent(id) + '/credentials', { appId, appSecret });
+    btn.disabled = false; btn.textContent = '保存并连接';
+    if (!r.ok) { msg.innerHTML = '<span class="badmsg">❌ ' + esc(r.error || '没通过验证') + '</span>'; return; }
+    msg.innerHTML = '<span class="okmsg">✅ ' + esc(r.note || '已保存，正在连上…') + '</span>';
+    sessionStorage.setItem('bothub-welcomed', '1');
+    setTimeout(() => { document.getElementById('welcome').hidden = true; credBuilt = false; refresh(); }, 1200);
+  });
+  document.getElementById('wLater')?.addEventListener('click', () => {
+    sessionStorage.setItem('bothub-welcomed', '1');
+    document.getElementById('welcome').hidden = true;
+  });
+  document.getElementById('reshow-welcome')?.addEventListener('click', () => maybeShowWelcome(true));
+  /**
+   * ⛔ 顺序要紧：**先**把公开配置（凭据清单）拿到，**再**渲染机器人页。
+   *    否则配置块里的"用哪个凭据"下拉第一次渲染是空的（实测就是这样）。
+   */
+  api('/api/config').then(function (p) { if (p && !p.error) PUB = p; }).catch(function () {}).finally(function () {
+    loadCfg();               // 机器人页的"配置下拉"要用它
+  });
+  maybeShowWelcome(false);   // ← 第一次打开自己弹
+  loadTheme();               // 颜色模式（浅色 / 深色 / 跟随 DSH）
+});
+
+  /**
+   * ── 新增机器人 / 凭证管理 ──
+   * 老板要的三件事：① 面板上能加空白机器人；② 一个凭证最多挂 4 个机器人；
+   * ③ 除默认机器人外，新增的机器人能自己选"连 DSH / 云端 / 本地"。
+   * 凭证值一律"先真连一次 QQ 验证，再落盘"（换不到 token 就一个字都不写）。
+   */
+  let credCache = [];
+  /**
+ * 凭据下拉的选项（新增机器人表单 + 每个机器人的配置共用）。
+ * 老板的规则：一个凭据最多 4 个机器人（**初始机器人不算**）；
+ * 满员的凭据直接 disabled + 标「已满」，不给用户"填完才报错"的体验。
+ */
+function credOptions(bot, pub) {
+  const creds = (pub && pub.credentials) || [];
+  const cap = (pub && pub.maxBotsPerCred) || 4;
+  const initialId = (pub && pub.initialBotId) || "";
+  const isInitial = !!(bot && bot.id === initialId);
+  const cur = bot ? (bot.credential || ("implicit-" + initialId)) : "";
+  const head = isInitial ? '<option value="">初始机器人（不占配额）</option>' : "";
+  if (!creds.length) return head + '<option value="">（还没有凭据）</option>';
+  return head + creds.map(function (c) {
+    const used = (c.bots || []).map(function (x) { return (x && x.id) ? x.id : x; }).filter(function (x) { return x !== initialId; }).length;
+    const full = used >= cap && c.id !== cur;
+    const label = esc(c.label || c.id) + "（" + used + "/" + cap + (full ? " 已满" : "") + "）";
+    return '<option value="' + esc(c.id) + '"' + (c.id === cur ? " selected" : "") + (full ? " disabled" : "") + ">" + label + "</option>";
+  }).join("");
+}
+
+function renderCreds(list, maxPer) {
+    credCache = list || [];
+    const box = document.getElementById('cred-list');
+    const hint = document.getElementById('cred-hint');
+    const sel = document.getElementById('nb-cred');
+    const cap = maxPer || 4;
+    if (hint) hint.textContent = '最多 ' + cap + ' 个机器人';
+    /**
+     * ⛔ 这里原来自己拼了一套选项（`c.bots.length + '/' + cap`），
+     *    结果是：① 计数把**初始机器人**也算进去了（显示 1/4，其实还能建 4 个）；
+     *            ② 满员不禁用、不标「已满」—— 跟机器人配置里的下拉两套逻辑，不一致。
+     *    统一走 `credOptions()`：它排除初始机器人、满员直接 disabled。
+     */
+    if (sel) sel.innerHTML = credOptions(null, PUB);
+    if (!box) return;
+    if (!credCache.length) {
+      box.innerHTML = '<p class="hint">默认用机器人自带的凭据；要另开一个机器人账号就点「+ 新增凭证」。</p>';
+      return;
+    }
+    box.innerHTML = credCache.map((c) => (
+      '<div class="credrow" data-credrow="' + esc(c.id) + '">' +
+        '<div class="who"><b>' + esc(c.label) + '</b><div class="cnt">' + esc(c.id) + ' · 挂了 ' + c.bots.length + '/' + cap + ' 个' + (c.bots.length ? '：' + c.bots.map(esc).join('、') : '') + '</div></div>' +
+        '<div class="cnt">' + (c.missing ? '<span class="badmsg">还没填值</span>' : esc(c.appIdShown || '已填')) + '</div>' +
+        '<div class="row" style="gap:8px">' +
+          '<input data-cid="' + esc(c.id) + '" data-f="appId" placeholder="appId">' +
+          '<input data-cid="' + esc(c.id) + '" data-f="appSecret" type="password" placeholder="appSecret">' +
+        '</div>' +
+        '<button class="ghost" data-credsave="' + esc(c.id) + '">保存并验证</button>' +
+      '</div>'
+    )).join('');
+    box.querySelectorAll('[data-credsave]').forEach((btn) => btn.onclick = async () => {
+      const id = btn.dataset.credsave;
+      const row = box.querySelector('[data-credrow="' + id + '"]');
+      const appId = row.querySelector('[data-f="appId"]').value.trim();
+      const appSecret = row.querySelector('[data-f="appSecret"]').value.trim();
+      const msg = document.getElementById('cred-msg');
+      if (!appId || !appSecret) { msg.innerHTML = '<span class="badmsg">appId 和 appSecret 都要填</span>'; return; }
+      btn.disabled = true; btn.textContent = '验证中…';
+      const r = await post('/api/credentials/' + encodeURIComponent(id) + '/values', { appId, appSecret });
+      btn.disabled = false; btn.textContent = '保存并验证';
+      msg.innerHTML = r.ok ? '<span class="okmsg">✅ ' + esc(r.note || '已保存') + '</span>'
+                           : '<span class="badmsg">❌ ' + esc(String(r.error).slice(0, 160)) + '</span>';
+      if (r.ok) setTimeout(() => location.reload(), 3000);
+    });
+  }
+
+  // 选"云端/本地"时才显示地址/模型/密钥那行，并填好默认值
+  document.getElementById('nb-kind')?.addEventListener('change', (e) => {
+    const cloud = e.target.value !== 'dsh';
+    const box = document.getElementById('nb-cloud');
+    if (box) box.hidden = !cloud;
+    if (!cloud) return;
+    const local = e.target.value === 'local';
+    document.getElementById('nb-url').value = local ? 'http://127.0.0.1:11434/v1' : 'https://api.openai.com/v1';
+    document.getElementById('nb-model').value = local ? 'qwen2.5:7b' : 'gpt-4o-mini';
+    document.getElementById('nb-key').value = local ? 'local-no-key' : '${ENV:OPENAI_API_KEY}';
+  });
+
+  // 创建机器人
+  document.getElementById('nb-go')?.addEventListener('click', async () => {
+    const btn = document.getElementById('nb-go');
+    const msg = document.getElementById('nb-msg');
+    const payload = {
+      id: document.getElementById('nb-id').value.trim(),
+      alias: document.getElementById('nb-alias').value.trim(),
+      kind: document.getElementById('nb-kind').value,
+      credential: document.getElementById('nb-cred').value || undefined,
+    };
+    if (!payload.id) { msg.innerHTML = '<span class="badmsg">先给它起个 id</span>'; return; }
+    if (payload.kind !== 'dsh') {
+      payload.baseURL = document.getElementById('nb-url').value.trim();
+      payload.model = document.getElementById('nb-model').value.trim();
+      payload.apiKey = document.getElementById('nb-key').value.trim();
+    }
+    btn.disabled = true; btn.textContent = '创建中…';
+    const r = await post('/api/bots/new', payload);
+    btn.disabled = false; btn.textContent = '创建';
+    msg.innerHTML = r.ok ? '<span class="okmsg">✅ ' + esc(r.note || '已创建') + '</span>'
+                         : '<span class="badmsg">❌ ' + esc(String(r.error).slice(0, 200)) + '</span>';
+    if (r.ok) setTimeout(() => location.reload(), 5000);
+  });
+
+  // 新增凭证
+  document.getElementById('cred-new')?.addEventListener('click', async () => {
+    const msg = document.getElementById('cred-msg');
+    const label = document.getElementById('cred-new-label').value.trim();
+    const r = await post('/api/credentials/new', { label });
+    msg.innerHTML = r.ok ? '<span class="okmsg">✅ ' + esc(r.note || '建好了') + '</span>'
+                         : '<span class="badmsg">❌ ' + esc(String(r.error).slice(0, 160)) + '</span>';
+    if (r.ok) setTimeout(() => location.reload(), 1800);
+  });
+</script>
+
+<!-- ── 教学引导：三步分页（①介绍 ②环境 ③绑定） ── -->
+<div id="welcome" hidden>
+  <div class="wbox">
+    <div class="whead">
+      <span class="wlogo">🐟</span>
+      <div class="wgrow">
+        <h2 id="wTitle">你好，我是 BotHub</h2>
+        <div class="wsub" id="wSub">让 QQ 机器人住在你自己的电脑上</div>
+      </div>
+      <span class="wdots" id="wDots">● ○ ○</span>
+    </div>
+
+    <!-- ① 介绍：可爱、突出主题 -->
+    <section class="wpage" data-p="1">
+      <div class="whero">🤖<span>＋</span>🐟<span>＋</span>💬</div>
+      <p class="wlead">一个软件，管好你所有的 QQ 机器人。</p>
+      <div class="wfeats">
+        <div class="wfeat"><b>会干活</b><span>接 DSH，能读文件、跑命令</span></div>
+        <div class="wfeat"><b>有记忆</b><span>聊过的存本机，压缩 + 关键词</span></div>
+        <div class="wfeat"><b>能多个</b><span>一个凭证最多挂 4 个机器人</span></div>
+        <div class="wfeat"><b>看得见</b><span>面板 + 体检 + 一键重启</span></div>
+      </div>
+    </section>
+
+    <!-- ② 环境：要什么 + 环境包一键配 -->
+    <section class="wpage" data-p="2" hidden>
+      <p class="wlead">电脑上先有这两样就够了：</p>
+      <ul class="wneed">
+        <li><b>DeepSeek Harness（DSH）</b><span>装好、能打开</span></li>
+        <li><b>DSH 里配好一个模型</b><span>云端厂商或免费插件都行</span></li>
+      </ul>
+      <p class="wlead2">不想自己配？下载环境包，解压后双击 <b>DSH环境一键配置.cmd</b> ——
+        它会自动找到 DSH、检查模型通道、把缺的插件和常驻进程装好。</p>
+      <div class="wbtns2">
+        <a class="wlink" id="wDownload" href="https://github.com/" target="_blank" rel="noreferrer">去 GitHub 下载环境包</a>
+      </div>
+    </section>
+
+    <!-- ③ 绑定：网址 + 两个框，小字能省就省 -->
+    <section class="wpage" data-p="3" hidden>
+      <p class="wlead">在 <a href="https://q.qq.com/" target="_blank" rel="noreferrer">q.qq.com</a>（手机 QQ 扫码）→ <b>开发设置</b> 里复制这两个值：</p>
+      <div class="wform">
+        <label class="f"><span>AppID</span><input id="w-appid" placeholder="10 位数字" autocomplete="off"></label>
+        <label class="f"><span>AppSecret</span><input id="w-secret" type="password" placeholder="一长串字符" autocomplete="off"></label>
+      </div>
+      <p class="wmini">只存这台电脑；保存前会真连一次 QQ 验证。</p>
+    </section>
+
+    <div class="wmsg" id="w-msg"></div>
+    <div class="wfoot">
+      <button class="ghost" id="wPrev">上一步</button>
+      <button class="primary" id="wNext">下一步</button>
+      <button class="ghost" id="wLater">跳过</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

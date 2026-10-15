@@ -1,0 +1,19 @@
+# 运行数据（日志、心跳、会话、面板截图）
+data/
+
+# 你的配置与密钥 —— 绝对不要提交
+config/bots.json
+config/secrets.json
+config/*.bak
+runtime/
+
+# 依赖与便携 Node（install.cmd 会自己装/下）
+node_modules/
+package-lock.json
+
+# 编辑器/系统
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.log
