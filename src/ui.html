@@ -742,10 +742,20 @@ async function refresh(){
    *   还会把展开的下拉收起来（体验上就是"写一半没了"）。搬节点则值和展开状态都保留。
    */
   const keepCfg = new Map();
+  /**
+   * ⛔ 老板反馈："配置的时候画面一闪一闪的，很不稳定。"
+   *    原因：refresh() 每 5 秒**整块重画**机器人卡（DOM 全量重建 → 整页重绘 = 闪一下），
+   *    正在填表时还容易丢光标/滚动位置。
+   *    所以：**只要用户正在这一页操作（配置下拉展开 / 光标在输入框里），这一轮就什么都不重画**，
+   *    等他不操作了下一个 5 秒自然会把最新状态画上去。
+   */
+  const aeNow = document.activeElement;
+  const botsBusy = !!(box.querySelector('details.botcfg[open]')
+    || (aeNow && /^(INPUT|TEXTAREA|SELECT)$/.test(aeNow.tagName) && box.contains(aeNow)));
   // ⚠️ 连**展开状态**一起记住：DOM 节点搬家时 open 属性有时会掉，显式带回来最稳
   box.querySelectorAll('details.botcfg').forEach((d) => keepCfg.set(d.dataset.cfgbot, { node: d, open: d.open }));
-  box.innerHTML = '';
-  for (const b of bots) {
+  if (botsBusy) { /* 用户在配置 → 不重画（保留内容/光标/展开状态） */ } else box.innerHTML = '';
+  for (const b of (botsBusy ? [] : bots)) {
     const q = b.queue || {};
     const c = document.createElement('div'); c.className = 'card';
     c.innerHTML = `
