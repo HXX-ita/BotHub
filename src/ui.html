@@ -1044,7 +1044,7 @@ async function buildCred(){
         <div class="line">appId <b>${esc(r.appIdShown || '—')}</b> · appSecret <b>${r.secretMasked && r.secretMasked !== '（空）' ? '已取到' : '—'}</b></div>
         <div class="grid2" style="margin-top:10px">
           <label class="f"><span>新的 appId </span><input id="cid-${esc(b.id)}" placeholder="不改就留空"></label>
-          <label class="f"><span>新的 appSecret </span><input id="csec-${esc(b.id)}" type="password" placeholder="粘贴新的 AppSecret" autocomplete="off"></label>
+          <label class="f"><span>新的 appSecret </span><input id="csec-${esc(b.id)}" type="text" placeholder="粘贴新的 AppSecret" autocomplete="off" spellcheck="false" name="bots-newsec-${esc(b.id)}" style="-webkit-text-security:disc"></label>
         </div>
         <div class="row"><button class="primary" data-cred="${esc(b.id)}">保存并验证</button>
         <span class="hint" id="cmsg-${esc(b.id)}"></span></div>
@@ -1788,6 +1788,18 @@ function credOptions(bot, pub) {
 }
 
 function renderCreds(list, maxPer) {
+    /**
+     * ⛔ 老板报「输凭据的时候一闪一闪的」：这张卡也是每 5 秒重绘，打字时输入框被重建。
+     *    规矩跟机器人页一样：**用户正在这张卡里打字（或框里已经有内容）时，这一轮不重绘** ——
+     *    等他离开输入框、内容清空之后，下一个 5 秒自然会把最新状态画上。
+     */
+    {
+      const listEl = document.getElementById('cred-list');
+      const ae = document.activeElement;
+      const typing = !!(ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && listEl && listEl.contains(ae));
+      const hasText = !!(listEl && [...listEl.querySelectorAll('input')].some((i2) => String(i2.value || '').trim()));
+      if (typing || hasText) return;
+    }
     credCache = list || [];
     const box = document.getElementById('cred-list');
     const hint = document.getElementById('cred-hint');
@@ -1813,8 +1825,10 @@ function renderCreds(list, maxPer) {
         '<div class="who"><b>' + esc(c.label) + '</b></div>' +
         '<div class="cnt">' + (c.missing ? '<span class="badmsg">还没填值</span>' : esc(c.appIdShown || '已填')) + '</div>' +
         '<div class="row" style="gap:8px">' +
-          '<input data-cid="' + esc(c.id) + '" data-f="appId" placeholder="appId">' +
-          '<input data-cid="' + esc(c.id) + '" data-f="appSecret" type="password" placeholder="appSecret">' +
+          '<input data-cid="' + esc(c.id) + '" data-f="appId" autocomplete="off" spellcheck="false" name="bots-appid-' + esc(c.id) + '" placeholder="appId">' +
+          '<!-- 老板报"老弹是否保存密码"：type=password 会被浏览器当成登录框。' +
+                    '     改成 text + -webkit-text-security:disc（一样看不到明文，但不再触发保存提示） -->' +
+                '<input data-cid="' + esc(c.id) + '" data-f="appSecret" type="text" autocomplete="off" spellcheck="false" name="bots-secret-' + esc(c.id) + '" style="-webkit-text-security:disc" placeholder="appSecret">' +
         '</div>' +
         '<button class="ghost" data-credsave="' + esc(c.id) + '">保存并验证</button>' +
       '</div>'
@@ -1937,7 +1951,7 @@ function renderCreds(list, maxPer) {
       <p class="wlead">在 <a href="https://q.qq.com/" target="_blank" rel="noreferrer">q.qq.com</a>（手机 QQ 扫码）→ <b>开发设置</b> 里复制这两个值：</p>
       <div class="wform">
         <label class="f"><span>AppID</span><input id="w-appid" placeholder="10 位数字" autocomplete="off"></label>
-        <label class="f"><span>AppSecret</span><input id="w-secret" type="password" placeholder="一长串字符" autocomplete="off"></label>
+        <label class="f"><span>AppSecret</span><input id="w-secret" type="text" autocomplete="off" spellcheck="false" name="bots-wizard-secret" style="-webkit-text-security:disc" placeholder="一长串字符"></label>
       </div>
       <p class="wmini">只存这台电脑；保存前会真连一次 QQ 验证。</p>
     </section>
