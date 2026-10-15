@@ -453,6 +453,37 @@ const hub = {
    * ⛔ 两条保护：① **初始机器人不许删**（它是配置里的第一个，删了整台机器都读不出来）；
    *              ② 删完不自动重启，界面提示“点重启应用生效”（跟别的配置修改一致）。
    */
+  /**
+   * ★ 删除凭据（老板要求：凭证也要有删除按钮）。
+   *   两道拒绝：① 初始（自带）凭据不能删；② 还绑着机器人的凭据不能删（先处理那个机器人）。
+   */
+  async removeCredential(credId) {
+    let raw = null;
+    try { raw = JSON.parse(fs.readFileSync(cfg.path, 'utf8')); } catch { return { ok: false, error: '读不到配置文件' }; }
+    if (!raw || !Array.isArray(raw.credentials)) return { ok: false, error: '配置里没有凭据列表' };
+    const id = String(credId);
+    // ⛔ 顺序很重要：**先判 implicit**（它压根不在 credentials[] 里，先查表会报成"没有这条凭证"，话说不清楚）
+    if (/^implicit-/.test(id)) {
+      const lb = (raw.credentials.find((c) => c && String(c.id) === id) || {}).label;
+      return { ok: false, error: '「' + (lb || '初始机器人自带的凭据') + '」是初始机器人自带的凭据，不能删。' };
+    }
+    const cred = raw.credentials.find((c) => c && String(c.id) === id);
+    if (!cred) return { ok: false, error: '没有这条凭证：' + id };
+    const bound = (raw.bots || []).filter((b) => b && String(b.credential || '') === id).map((b) => String(b.id));
+    if (bound.length) return { ok: false, error: '这条凭据还绑着机器人（' + bound.join('、') + '）—— 请先把那个机器人删掉，或者给它换一条凭据。' };
+    const before = raw.credentials.length;
+    raw.credentials = raw.credentials.filter((c) => !c || String(c.id) !== id);
+    fs.writeFileSync(cfg.path, JSON.stringify(raw, null, 2), 'utf8');
+    // 顺手把它的密钥条目也清掉（留着没用，还是泄露源）
+    try {
+      const sec = readJson(SECRETS_PATH, {}) || {};
+      if (sec[id]) { delete sec[id]; writeJson(SECRETS_PATH, sec); }
+    } catch { /* 清不掉不影响删凭据 */ }
+    loadConfig();
+    hostCache = null;
+    log.info(`已删除凭据 ${id}（原有 ${before} 条）`);
+    return { ok: true, note: '已删除凭据「' + (cred.label || id) + '」' };
+  },
   async removeBot(id) {
     let raw = null;
     try { raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { return { ok: false, error: '读不到配置文件' }; }

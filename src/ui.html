@@ -1831,8 +1831,25 @@ function renderCreds(list, maxPer) {
                 '<input data-cid="' + esc(c.id) + '" data-f="appSecret" type="text" autocomplete="off" spellcheck="false" name="bots-secret-' + esc(c.id) + '" style="-webkit-text-security:disc" placeholder="appSecret">' +
         '</div>' +
         '<button class="ghost" data-credsave="' + esc(c.id) + '">保存并验证</button>' +
+        /* 老板要求：凭证也要能删。初始（自带）凭据不给按钮，别的都给（点了会问一次） */
+        (c.implicit ? '' : '<button class="delbot" data-delcred="' + esc(c.id) + '">删除</button>') +
       '</div>'
     )).join('');
+    // 删除凭据：问一次再删（跟机器人卡上那个删除一个规矩）
+    box.querySelectorAll('[data-delcred]').forEach((btn) => btn.onclick = async () => {
+      const id = btn.dataset.delcred;
+      const row = btn.closest('[data-credrow]');
+      const name = row && row.querySelector('b') ? row.querySelector('b').textContent : id;
+      if (!window.confirm('确定删除凭据「' + name + '」吗？\n（它里面填过的 appId/appSecret 也会一起删掉）')) return;
+      const r = await post('/api/credentials/' + encodeURIComponent(id) + '/delete', {});
+      const m = document.getElementById('cred-msg');
+      if (m) {
+        m.innerHTML = r.ok
+          ? '<span class="okmsg">✅ ' + esc(r.note || '已删除') + '</span>'
+          : '<span class="badmsg">❌ ' + esc(String(r.error || '删除失败').slice(0, 160)) + '</span>';
+      }
+      cfgLoaded = false; try { loadCfg(); } catch { /* ignore */ } refresh();
+    });
     box.querySelectorAll('[data-credsave]').forEach((btn) => btn.onclick = async () => {
       const id = btn.dataset.credsave;
       const row = box.querySelector('[data-credrow="' + id + '"]');

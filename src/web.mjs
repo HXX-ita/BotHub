@@ -177,6 +177,11 @@ export function startWeb({ port, host, hub, log }) {
        */
       {
         const readJsonBody = async () => { let raw = ''; for await (const chunk of req) raw += chunk; return JSON.parse(raw || '{}'); };
+        /** 删除凭据：POST /api/credentials/<id>/delete */
+      {
+        const mc = /^\/api\/credentials\/([^/]+)\/delete$/.exec(url.pathname);
+        if (req.method === 'POST' && mc) return json(res, await hub.removeCredential(decodeURIComponent(mc[1])));
+      }
         /** 删除机器人：POST /api/bots/<id>/delete */
       {
         const m = /^\/api\/bots\/([^/]+)\/delete$/.exec(url.pathname);
