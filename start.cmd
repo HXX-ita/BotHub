@@ -33,7 +33,10 @@ schtasks /Change /TN "BotHub-Supervisor" /ENABLE >nul 2>&1
 schtasks /Change /TN "BotHub-Ensure" /ENABLE >nul 2>&1
 
 "%NODE%" "tools\start-bothub-supervisor.mjs" --ensure >> "%LOG%" 2>&1
-"%NODE%" "tools\wait-panel.mjs" >> "%LOG%" 2>&1
+rem wait for the panel -- goes to the CONSOLE so the user sees the spinning
+rem "starting up" animation (the script logs one line itself).
+echo   - waiting for the panel (first run can take a few seconds)...
+"%NODE%" "tools\wait-panel.mjs"
 wscript.exe //nologo "tools\start-tray.vbs"
 "%NODE%" "tools\open-window.mjs" >> "%LOG%" 2>&1
 

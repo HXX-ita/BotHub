@@ -48,7 +48,21 @@ const child = spawn(edge, [
   `--app=${URL_}`,
   '--window-size=960,700',
   `--user-data-dir=${path.join(ROOT, 'data', 'edge-profile')}`,
+  /**
+   * ⛔ 老板反馈："桌面上多了个纯白窗口，托盘全部退出时它也跟着消失"。
+   *    那是 Edge 在 `--app=` 启动时**顺带开出来的空白窗口**（恢复上次会话 / 崩溃气泡 / 新装配置），
+   *    它绑定在这次启动的 Edge 实例上，所以退出应用时一起没了。
+   *    下面这几个参数就是专门关掉这些"顺带窗口"的：
+   *    --no-restore-last-session       不恢复上次会话（空白窗口最常见的来源）
+   *    --disable-session-crashed-bubble 不要"未正常关闭"气泡
+   *    --no-first-run / --no-default-browser-check  首次运行那些引导窗口
+   *    --disable-features=...          关掉"启动时打开新标签页/继续上次浏览"
+   */
   '--no-first-run', '--no-default-browser-check',
+  '--no-restore-last-session',
+  '--disable-session-crashed-bubble',
+  '--disable-features=StartupBrowserWindow,SessionRestore',
+  '--hide-crash-restore-bubble',
 ], { detached: true, stdio: 'ignore', windowsHide: true });
 child.unref();
 console.log('已打开应用窗口');
