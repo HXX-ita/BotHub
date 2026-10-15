@@ -109,7 +109,15 @@ export function loadConfig() {
     const initialIdEarly = String((cfg.bots && cfg.bots[0] && cfg.bots[0].id) || '');
     const implicitDefault = initialIdEarly ? ("implicit-" + initialIdEarly) : null;
     let cred = null;      // 声明在 if/else **外面**：下面机器人对象也要用它
-    if (isStr(b.credential)) {
+    /**
+     * ⛔ 关键：机器人**自带凭据**（`credentials: {appId: "${SECRET:…}"}`）时，
+     *    即使配置里被写上了 `credential: "implicit-<它自己>"`，也必须走下面那条解析分支 ——
+     *    否则密钥不会被解析（日志："还没填 appId / appSecret"）→ 机器人直接连不上。
+     *    （老板的机器人 22:54 掉线就是这个原因：配置里有这行，被这个显式分支截走了。）
+     */
+    const ownImplicit = 'implicit-' + b.id;
+    const isOwnImplicit = isStr(b.credential) && b.credential === ownImplicit;
+    if (isStr(b.credential) && !(b.credentials && isOwnImplicit)) {
       cred = creds.get(b.credential) || null;
       /**
        * 「初始凭据」= 初始机器人自带的那条隐式凭据（implicit-<初始机器人 id>）。
