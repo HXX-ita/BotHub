@@ -2,11 +2,14 @@
 rem ===================================================================
 rem  Start BotHub - double-click this file.
 rem
+rem  What it does (2026-10-16, changed at the boss's request):
 rem    1. enable the keep-alive tasks (in case "full exit" disabled them)
-rem    2. make sure the app is running
-rem    3. wait until the panel answers (no "can't connect" white window)
-rem    4. put the tray icon in the notification area
-rem    5. open the panel as a plain window (Edge/Chrome app mode)
+rem    2. make sure the app is running -- started in the BACKGROUND
+rem    3. put the tray icon in the notification area
+rem
+rem  It does NOT open the panel any more: nothing pops up on start.
+rem  Open the panel yourself from the tray icon -> "open panel".
+rem  This file itself exits immediately and shows no console window.
 rem
 rem  ASCII-only + CRLF: cmd.exe reads scripts in the OEM codepage.
 rem ===================================================================
@@ -16,32 +19,31 @@ cd /d "%~dp0"
 if not exist "data\logs" mkdir "data\logs"
 set "LOG=data\logs\launcher.log"
 
-set "NODE="
-if exist "runtime\node\node.exe" set "NODE=%CD%\runtime\node\node.exe"
-if not defined NODE (
-  for %%I in (node.exe) do if not "%%~$PATH:I"=="" set "NODE=%%~$PATH:I"
+rem make sure Node is around at all: if it is missing, nothing can start.
+rem (run-hidden.vbs resolves the exact path by itself afterwards.)
+set "HAVENODE="
+if exist "runtime\node\node.exe" set "HAVENODE=1"
+if not defined HAVENODE (
+  for %%I in (node.exe) do if not "%%~$PATH:I"=="" set "HAVENODE=1"
 )
-if not defined NODE if exist "%ProgramFiles%\nodejs\node.exe" set "NODE=%ProgramFiles%\nodejs\node.exe"
-if not defined NODE (
+if not defined HAVENODE if exist "%ProgramFiles%\nodejs\node.exe" set "HAVENODE=1"
+if not defined HAVENODE (
   echo Node.js not found. Please run install.cmd first.
   pause
   exit /b 1
 )
 
-echo [%DATE% %TIME%] ===== start BotHub ===== >> "%LOG%"
+echo [%DATE% %TIME%] ===== start BotHub (background, no panel) ===== >> "%LOG%"
 
 schtasks /Change /TN "BotHub-Supervisor" /ENABLE >nul 2>&1
 schtasks /Change /TN "BotHub-Ensure" /ENABLE >nul 2>&1
 
-rem ensure goes to the CONSOLE too: on a cold start this step is the slow one,
-rem and the boss must see *something* happening while it waits.
-echo   - starting the app (first time can take ~10s)...
-"%NODE%" "tools\start-bothub-supervisor.mjs" --ensure
-rem wait for the panel -- goes to the CONSOLE so the user sees the spinning
-rem "starting up" animation (the script logs one line itself).
-echo   - waiting for the panel (first run can take a few seconds)...
-"%NODE%" "tools\wait-panel.mjs"
+rem app + supervisor, started HIDDEN (no console, no panel window)
+wscript.exe //nologo "tools\run-hidden.vbs" "start-bothub-supervisor.mjs" --ensure
+
+rem tray icon (hidden; it holds a single-instance lock so no double icons)
 wscript.exe //nologo "tools\start-tray.vbs"
-"%NODE%" "tools\open-window.mjs" >> "%LOG%" 2>&1
+
+rem NOTE: the panel is NOT opened here on purpose -- use the tray menu.
 
 exit /b 0
