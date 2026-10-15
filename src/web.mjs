@@ -37,7 +37,18 @@ export function startWeb({ port, host, hub, log }) {
     const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
     try {
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        /**
+         * ⛔ 一定要禁缓存！老板连着两轮说"画面还是一闪一闪的 / 日志不稳定"，
+         *    而我明明已经修了 —— 真因是**浏览器一直在用缓存里的旧界面**：
+         *    这里原来只发 content-type，没有任何缓存头，浏览器就按"启发式缓存"留住旧 HTML。
+         *    面板是本地服务、每次读磁盘（秒开），禁缓存没有任何代价。
+         */
+        res.writeHead(200, {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store, no-cache, must-revalidate, max-age=0',
+          pragma: 'no-cache',
+          expires: '0',
+        });
         return res.end(uiHtml());
       }
       if (url.pathname === '/api/status') return json(res, hub.status());

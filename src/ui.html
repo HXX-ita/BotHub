@@ -764,7 +764,22 @@ async function refresh(){
    *    等他不操作了下一个 5 秒自然会把最新状态画上去。
    */
   const aeNow = document.activeElement;
-  const botsBusy = !!(box.querySelector('details.botcfg[open]')
+  /**
+   * 要不要重建卡片？**只在机器人集合变了（新增/删除）或还没有卡片时**才重建。
+   *
+   * 为什么必须这样（老板连着报的两个问题都是它）：
+   *   refresh() 每 5 秒跑一次 —— 重建 DOM 会
+   *     ① 丢掉正在填的输入（"配置更新了别的信息不跟着"那次的反面）
+   *     ② **把展开的日志关掉**：点「看日志」能展开，但滚轮一往下翻就"一下消失"
+   *     ③ 整页闪一下（"画面还是一闪一闪的"）
+   *   所以：只要有卡片且机器人没增减，就**绝不重建**，一律走下面的"就地更新"。
+   */
+  const idsNow = bots.map((b) => b.id).join(',');
+  const idsDom = [...box.children].map((c) => c.dataset.bot || '').join(',');
+  const sameCards = !!idsNow && idsNow === idsDom;
+  const anyLogOpen = [...box.querySelectorAll('pre[id^="log-"]')].some((p) => p.style.display !== 'none' && String(p.textContent || '').trim());
+  const botsBusy = sameCards || anyLogOpen
+    || !!(box.querySelector('details.botcfg[open]')
     || (aeNow && /^(INPUT|TEXTAREA|SELECT)$/.test(aeNow.tagName) && box.contains(aeNow)));
   // ⚠️ 连**展开状态**一起记住：DOM 节点搬家时 open 属性有时会掉，显式带回来最稳
   box.querySelectorAll('details.botcfg').forEach((d) => keepCfg.set(d.dataset.cfgbot, { node: d, open: d.open }));
@@ -799,6 +814,7 @@ async function refresh(){
   for (const b of (botsBusy ? [] : bots)) {
     const q = b.queue || {};
     const c = document.createElement('div'); c.className = 'card';
+    c.dataset.bot = b.id;            // ← "机器人集合有没有变"就靠它比对（没变就不重建）
     c.innerHTML = `
       <h3><span class="dot ${b.running?'ok':'bad'}" data-dot="${esc(b.id)}" style="width:10px;height:10px"></span><span class="prof-name" id="pn-${esc(b.id)}">${esc(b.alias || b.id)}</span>
         <span class="tag" data-tagchan="${esc(b.id)}">${esc(b.channel)}</span><span class="tag" data-tagmodel="${esc(b.id)}" title="${b.modelPinned ? '面板上钉住了这个模型（插件轮切会被绕过）' : '跟随 DSH 默认（免费插件的自动轮切生效）'}">${b.modelPinned ? '指定 ' : ''}${esc(b.model || '')}</span>${qBtn('prof')}</h3>
