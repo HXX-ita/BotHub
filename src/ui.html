@@ -1191,7 +1191,8 @@ async function fillModelSelect(i) {
   const provs = new Set();
   for (const pr of ((m && m.providers) || [])) {
     provs.add(pr.id);
-    for (const id of (pr.models || [])) opts.push({ v: id, label: (pr.displayName || pr.id) + ' · ' + id });
+    // 老板要求：模型选项直接写成「供应商-模型名」（供应商不再单独选，避免两者打架）
+    for (const id of (pr.models || [])) opts.push({ v: id, label: pr.id + '-' + id, prov: pr.id });
   }
   /**
    * 云端通道的模型**只给云端/本地的机器人**看；DSH 的机器人不该在这里看到它们
@@ -1225,7 +1226,8 @@ async function fillModelSelect(i) {
   sel.innerHTML = '<option value="">跟随 DSH（自动轮切）</option>'
     + uniq.map((v) => {
         const o = opts.find((x) => x.v === v);
-        return '<option value="' + esc(v) + '">' + esc(o.label) + '</option>';
+        // data-prov：选中的是哪个供应商的模型 —— 保存时按它写 provider（模型即供应商）
+        return '<option value="' + esc(v) + '" data-prov="' + esc(o.prov || '') + '">' + esc(o.label) + '</option>';
       }).join('')
     + (cur && !uniq.includes(cur) ? '<option value="' + esc(cur) + '">' + esc(cur) + '（当前，不在清单里）</option>' : '');
   sel.value = uniq.includes(keep) ? keep : cur;
@@ -1301,8 +1303,7 @@ async function loadCfg(){
           <select data-i="${i}" data-k="model"><option value="">跟随 DSH（自动轮切）</option></select></label>
       </div>
       <div class="grid2">
-        <label class="f"><span>供应商</span>
-          <select data-i="${i}" data-k="provider"><option value="">跟随默认</option></select></label>
+        ${/* 老板要求：**取消"供应商"这个选框** —— 供应商以后在模型选项里以「供应商-模型名」体现 */''}
         <label class="f"><span>推理等级</span>
           <select data-i="${i}" data-k="reasoningEffort">
             <option value="" ${!b.reasoningEffort ? 'selected' : ''}>跟随 DSH</option>
@@ -1421,6 +1422,13 @@ async function saveAllBots(btn) {
     if (k === 'mentionRequired' || k === 'noTools') v = (v === 'true');
     // 初始机器人的凭据是自带的，界面上锁死了 —— 保存时**不写**这个字段（免得写上一个显式值）
     if (k === 'credential' && cfg2.bots[i] && PUB && cfg2.bots[i].id === PUB.initialBotId) return;
+    // 模型即供应商：选了 `供应商-模型名` 就按 option 上的 data-prov 写 provider
+    if (k === 'model') {
+      const o = el.selectedOptions && el.selectedOptions[0];
+      const prov = o ? (o.dataset.prov || '') : '';
+      cfg2.bots[i].provider = prov || undefined;
+      if (!prov) delete cfg2.bots[i].provider;
+    }
     if (k === 'limits.perPeerPerMin') { cfg2.bots[i].limits = cfg2.bots[i].limits || {}; cfg2.bots[i].limits.perPeerPerMin = Number(v) || 8; return; }
     if (k === 'queue.maxProcessingMs') { cfg2.bots[i].queue = cfg2.bots[i].queue || {}; cfg2.bots[i].queue.maxProcessingMs = (Number(v) || 300) * 1000; return; }
     cfg2.bots[i][k] = v;
