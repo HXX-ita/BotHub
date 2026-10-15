@@ -14,7 +14,7 @@ import { execFile } from 'node:child_process';
 import { BotInstance } from './bot.mjs';
 import { loadConfig, writeExample, publicConfig, CONFIG_PATH, readConfigText, saveConfigText } from './config.mjs';
 import { startWeb } from './web.mjs';
-import { makeLogger, writeJson, readJson, DATA, stamp, mask, lightMask, SECRETS_PATH, writeBotHubSecret, listDshProfiles, dshHomePath } from './util.mjs';
+import { makeLogger, writeJson, readJson, DATA, ROOT, stamp, mask, lightMask, SECRETS_PATH, writeBotHubSecret, listDshProfiles, dshHomePath } from './util.mjs';
 import { listDshProviders, scanProfilePatches } from './models.mjs';
 
 /**
@@ -222,6 +222,21 @@ if (prevPid && prevPid !== process.pid) {
 fs.writeFileSync(PIDFILE, String(process.pid), 'utf8');
 process.on('exit', () => { try { if (Number(fs.readFileSync(PIDFILE, 'utf8').trim()) === process.pid) fs.rmSync(PIDFILE, { force: true }); } catch { /* ignore */ } });
 
+/**
+ * 版本号：从 package.json 读（发版改了版本号，界面左下角自动跟着变）。
+ * 老板要求：连接状态下面显示「版本号：v0.1.0 · 发布者：HXX-ita」。
+ */
+const APP_VERSION = (() => {
+  try {
+    const v = readJson(path.join(ROOT, 'package.json'), {}).version || '';
+    if (!v) console.warn('[warn] package.json 里没有 version 字段');
+    return v;
+  } catch (e) {
+    console.warn('[warn] 读版本号失败：' + (e && e.message));
+    return '';
+  }
+})();
+
 const startedAt = Date.now();
 const bots = [];
 const byId = new Map();
@@ -243,12 +258,13 @@ const hub = {
   lanToken() {
     try { return (cfg.http && cfg.http.lanToken) || null; } catch { return null; }
   },
-  publicConfig() {
-    try { return publicConfig(cfg); } catch (e) { return { error: String(e && e.message) }; }
+  publicConfig() {    try { return publicConfig(cfg); } catch (e) { return { error: String(e && e.message) }; }
   },
   status() {
     return {
       at: new Date().toISOString(),
+      // 界面左下角那行小字要用：「版本号：v0.1.0 · 发布者：HXX-ita」
+      version: APP_VERSION,
       uptimeSec: Math.round((Date.now() - startedAt) / 1000),
       pid: process.pid,
       rssMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
@@ -827,6 +843,9 @@ const hub = {
 
     const value = {
       at: new Date().toISOString(),
+      // 版本号给界面显示（老板要求：连接状态下面那行小字写版本号 + 发布者）。
+      // 直接从 package.json 读，避免"界面写死一个版本、发版忘了改"。
+      version: APP_VERSION,
       app: { pid: process.pid, uptimeSec: Math.round((Date.now() - startedAt) / 1000), rssMB: Math.round(process.memoryUsage().rss / 1024 / 1024), heartbeatAgeSec: hb && hb.at ? Math.round((Date.now() - hb.at) / 1000) : null },
       appCount: apps.length, appPids: apps.map((p) => p.pid),
       supervisor: { count: sups.length, pids: sups.map((p) => p.pid) },
@@ -1158,6 +1177,7 @@ process.on('SIGHUP', bye);
 
 log.info(`BotHub 已启动：pid ${process.pid}，${bots.length} 个机器人，面板 http://${cfg.http.host}:${port}/`);
 log.info(`机器：${os.hostname()} / Node ${process.version}`);
+log.info(`版本号 ${APP_VERSION || '(读不到)'}（界面左下角会显示：版本号 + 发布者）`);
 
 /**
  * ★ 每次启动都**强制重取一次平台资料**（老板要求：

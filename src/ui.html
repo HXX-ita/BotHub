@@ -48,6 +48,9 @@
   .side-foot{margin-top:0;display:flex;align-items:center;gap:8px;padding:10px 12px;
              border-top:1px solid var(--line);color:var(--muted);font-size:0.862em}
   .side-foot .dot{width:9px;height:9px;box-shadow:none}
+  /* 版本 / 发布者：连接状态下面那行小字（比状态更淡一点，别抢眼） */
+  .verline{padding:0 12px 10px;color:var(--muted);font-size:0.78em;opacity:.72;line-height:1.35}
+  html[data-theme="dark"] .verline{opacity:.6}
   main{padding:18px 22px 34px;max-width:960px;min-width:0}
   /* 顶栏：粘住 + 毛玻璃 —— 滚动时内容从它下面穿过去 */
   .topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;
@@ -454,6 +457,8 @@
     <div class="side-foot" id="sideFoot" title="应用 / 机器人 / 连接状态">
       <span class="dot" id="dot"></span><span id="sideStatus">连接中…</span>
     </div>
+    <!-- 老板要求：连接状态下面再加一行小字，写版本号和发布者 -->
+    <div class="verline" id="verLine" title="版本 / 发布者">版本号：v0.1.0 · 发布者：HXX-ita</div>
   </aside>
 
   <main>
@@ -769,6 +774,14 @@ async function refresh(){
     const problem = ns.some(n => n.level === 'warn');
     $('#dot').className = problem ? 'dot warn' : 'dot ok';
     setFoot(problem ? 'warn' : 'ok', problem ? '有需要注意的地方' : '机器人已连接');
+  // 连接状态下面那行小字：版本号 + 发布者（版本从接口来，发版自动跟着变）
+  {
+    const vl = document.getElementById('verLine');
+    if (vl) {
+      const v = (st && st.version) ? String(st.version) : '';
+      vl.textContent = (v ? '版本号：v' + v + ' · ' : '') + '发布者：HXX-ita';
+    }
+  }
     const bits = [live.length + ' 个在跑'];
     bits.push(lastMsgSec === null ? '还没收到过消息' : '最后收到 ' + ago(lastMsgSec));
     setFoot(null, (problem ? '有需要注意的地方 · ' : '机器人已连接 · ') + bits.join(' · '));
