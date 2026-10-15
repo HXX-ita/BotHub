@@ -1826,7 +1826,8 @@ function renderCreds(list, maxPer) {
     btn.disabled = false; btn.textContent = '创建';
     msg.innerHTML = r.ok ? '<span class="okmsg">✅ ' + esc(r.note || '已创建') + '</span>'
                          : '<span class="badmsg">❌ ' + esc(String(r.error).slice(0, 200)) + '</span>';
-    if (r.ok) setTimeout(() => location.reload(), 5000);
+    // 就地刷新（老板不喜欢"跳页"：原来这里 location.reload() 会把滚动位置和当前页都重置）
+    if (r.ok) setTimeout(() => { cfgLoaded = false; try { loadCfg(); } catch (e) { console.warn(e); } refresh(); }, 900);
   });
 
   // 新增凭证
@@ -1836,7 +1837,7 @@ function renderCreds(list, maxPer) {
     const r = await post('/api/credentials/new', { label });
     msg.innerHTML = r.ok ? '<span class="okmsg">✅ ' + esc(r.note || '建好了') + '</span>'
                          : '<span class="badmsg">❌ ' + esc(String(r.error).slice(0, 160)) + '</span>';
-    if (r.ok) setTimeout(() => location.reload(), 1800);
+    if (r.ok) setTimeout(() => { cfgLoaded = false; try { loadCfg(); } catch (e) { console.warn(e); } refresh(); }, 900);
   });
 </script>
 
