@@ -1164,7 +1164,28 @@ async function fillModelSelect(i) {
    * （老板："模型通道、模型、供应商不该出现 dsh 可提供列表之外的选项"）。
    */
   const myKind = kindOfChannel(cfgBots[i] ? cfgBots[i].channel : "");
-  if (m && m.openai && myKind !== "dsh") for (const id of (m.openai.models || [])) opts.push({ v: id, label: m.openai.channel + ' · ' + id });
+  /**
+   * 老板要求：**云端/本地的机器人，模型通道和模型都是固定的** ——
+   *   · 通道：只列它自己那条（模板里已经按类型过滤）
+   *   · 模型：**只列它自己那条通道带的模型**（不再列 DSH 的、也不列别的通道的）
+   * 所以这类机器人压根不走"拉一堆候选"的路，直接用它自己的模型。
+   */
+  const myChan = ((PUB && PUB.channels) || []).find((c) => c.id === (cfgBots[i] ? cfgBots[i].channel : "")) || null;
+  let opts2;
+  if (myKind !== "dsh") {
+    const own = (cfgBots[i] && cfgBots[i].model) || (myChan && myChan.model) || "";
+    opts2 = own ? [{ v: own, label: own }] : [];
+    const sel2 = document.querySelector('.botcfg select[data-k="model"][data-i="' + i + '"]');
+    if (sel2) {
+      sel2.innerHTML = opts2.length ? opts2.map((o) => '<option value="' + esc(o.v) + '" selected>' + esc(o.label) + "</option>").join("")
+        : '<option value="">（这个通道没配模型）</option>';
+      sel2.value = opts2.length ? opts2[0].v : "";
+      sel2.disabled = true;
+    }
+    const pv2 = document.querySelector('.botcfg select[data-k="provider"][data-i="' + i + '"]');
+    if (pv2) pv2.disabled = true;
+    return;
+  }
   const cur = cfgBots[i].model || '';
   const uniq = [...new Set(opts.map((o) => o.v))];
   sel.innerHTML = '<option value="">跟随 DSH（自动轮切）</option>'
