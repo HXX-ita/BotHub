@@ -426,6 +426,11 @@
   .botcfg[data-botkind="openai"] label.f:has([data-k="permission"]),
   .botcfg[data-botkind="openai"] label.f:has([data-k="noTools"]),
   .botcfg[data-botkind="openai"] label.f:has([data-k="provider"]){display:none !important}
+  /* 统一提示条：显示 → 2 秒后淡淡消失
+     （老板要求：像「先给它起个 id」这种提示小字，都显示两秒然后淡出） */
+  .flashmsg{opacity:0;transition:opacity .45s ease}
+  .flashmsg.show{opacity:1}
+  .flashmsg.fade{opacity:0}
 </style>
 </head>
 <body>
@@ -778,6 +783,7 @@ async function refresh(){
     for (const k of Object.keys(profById)) if (!alive.has(k)) delete profById[k];
   }
   renderHeroProfile();
+  watchMsgHints();          // 提示小字统一「显示两秒后淡出」（每轮刷新都接一遍，新元素也能接管）
   /**
    * 左下角那行状态**只写一次**（前面 setFoot 已经把"连接状态 + 细节"写好了）。
    * ⛔ 原来这里又覆盖了一次（只写"1 个在跑"），把连接状态盖掉 ——
@@ -1727,6 +1733,36 @@ function applyChannelLogic(scope) {
     const isCloud = kb.value === "cloud" || kb.value === "local";
     row.hidden = !isCloud;
     row.querySelectorAll("input").forEach((el) => { el.disabled = !isCloud; });
+  }
+}
+/**
+ * 统一接管「提示小字」的行为（老板要求：显示两秒然后淡出）。
+ *   · 这些元素里一有字 → 显示；**2 秒后**淡淡消失；
+ *   · 以「…」结尾的是**进度提示**（处理中… / 验证中…），**不淡出**（否则进度就没了）；
+ *   · 用 MutationObserver 统一接管，避免把十几处赋值点逐个改（漏一处又会不一致）；
+ *   · `[data-savemsg]` 自己有「喵~三态」的实现，这里跳过它。
+ */
+function watchMsgHints() {
+  const SEL = ['#rebootMsg', '#nb-msg', '#cfgmsg', '#cred-msg', '#maintmsg', '#w-msg', '[data-cmsg]'];
+  for (const sel of SEL) {
+    for (const el of document.querySelectorAll(sel)) {
+      if (el.dataset.flashWired) continue;
+      el.dataset.flashWired = '1';
+      el.classList.add('flashmsg');
+      const apply = () => {
+        const txt = (el.textContent || '').trim();
+        if (!txt) return;
+        if (/…$/.test(txt)) { el.classList.remove('fade'); el.classList.add('show'); return; }
+        el.classList.remove('fade');
+        void el.offsetWidth;
+        el.classList.add('show');
+        clearTimeout(el.__ft); clearTimeout(el.__ct);
+        el.__ft = setTimeout(() => el.classList.add('fade'), 2000);
+        el.__ct = setTimeout(() => { if (el.classList.contains('fade')) { el.innerHTML = ''; el.classList.remove('show'); } }, 2900);
+      };
+      new MutationObserver(apply).observe(el, { childList: true, characterData: true, subtree: true });
+      apply();
+    }
   }
 }
 function credOptions(bot, pub) {
