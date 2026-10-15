@@ -306,7 +306,9 @@ export function loadConfig() {
 
   return {
     raw: cfg,
-    http: { port: Number(cfg.http?.port) || 7788, host: cfg.http?.host || '127.0.0.1' },
+    // ⛔ 这里原来只挑 port/host，把 lanToken 丢了 → 局域网口令门拿到的是 undefined，
+    //    于是"局域网必须带口令"形同虚设（实测：从局域网地址请求也能直接 200）。
+    http: { port: Number(cfg.http?.port) || 7788, host: cfg.http?.host || '127.0.0.1', lanToken: cfg.http?.lanToken || null },
     channels,
     credentials: creds,
     credentialList,

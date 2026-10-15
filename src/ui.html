@@ -1526,7 +1526,11 @@ $('#cfgsave').onclick = async () => {
   if (r.ok) { cfgLoaded = false; loadCfg(); }
 };
 $('#cfgreset').onclick = async () => { cfgLoaded = false; await loadCfg(); $('#cfgmsg').textContent = '已放弃改动'; };
-if (location.protocol === 'http:' && location.hostname === '127.0.0.1' && !navigator.userAgent.includes('Edg/')) $('#openpage').hidden = false;
+/**
+ * 老板报"在浏览器打开按钮不见了"：原来的条件是"http + 127.0.0.1 + **不是 Edge**" ——
+ * 而面板的窗口本来就是 Edge（app 模式），于是**永远不显示**。现在只要是通过 http 打开的，就显示它。
+ */
+if (location.protocol === 'http:') $('#openpage').hidden = false;
 $('#openpage').onclick = () => window.open(location.href, '_blank');
 
 refresh();

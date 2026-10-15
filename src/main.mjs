@@ -239,6 +239,10 @@ const hub = {
    *    结果凭据下拉永远是空的（显示「（还没有凭据）」），
    *    「新增机器人时能选初始机器人的初始凭据」这条需求实际上**没生效**。补上它。
    */
+  /** 局域网口令（给 web.mjs 的口令门用；没开局域网就是 null） */
+  lanToken() {
+    try { return (cfg.http && cfg.http.lanToken) || null; } catch { return null; }
+  },
   publicConfig() {
     try { return publicConfig(cfg); } catch (e) { return { error: String(e && e.message) }; }
   },

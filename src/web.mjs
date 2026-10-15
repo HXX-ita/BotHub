@@ -35,6 +35,27 @@ export function startWeb({ port, host, hub, log }) {
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
+    /**
+     * ★ 局域网口令（老板要在手机上管理，所以要监听局域网 —— 但面板能看到凭据，**裸暴露不安全**）：
+     *   · 来自本机（127.0.0.1 / ::1）的请求：**不需要口令**（面板窗口、脚本都走本机）；
+     *   · 来自局域网其它设备的请求：必须带 `?k=<口令>` 或 `Cookie: bk=<口令>`，否则一律 403。
+     *   口令存在配置里（http.lanToken），开局域网时自动生成。
+     */
+    try {
+      const remote = String(req.socket.remoteAddress || '');
+      const isLocal = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
+      const want = (hub.lanToken && hub.lanToken()) || null;
+      if (!isLocal && want) {
+        const got = url.searchParams.get('k') || (/(?:^|;\s*)bk=([^;]+)/.exec(req.headers.cookie || '') || [])[1] || '';
+        if (got !== want) {
+          res.writeHead(403, { 'content-type': 'text/html; charset=utf-8' });
+          res.end('<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;padding:40px;line-height:1.8">' +
+            '<h2>需要一个口令</h2><p>这台面板只能在带口令的链接里打开。请用电脑上 BotHub 面板里给出的<b>手机访问地址</b>（带 ?k=… 的那一串）。</p></body>');
+          return;
+        }
+        res.setHeader('set-cookie', 'bk=' + encodeURIComponent(want) + '; Path=/; Max-Age=604800; SameSite=Lax');
+      }
+    } catch { /* 口令检查出问题时不拦本机；局域网那边会走到 403 分支 */ }
     try {
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
         /**
