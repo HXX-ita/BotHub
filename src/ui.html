@@ -1717,7 +1717,8 @@ function applyChannelLogic(scope) {
 }
 function credOptions(bot, pub) {
   const creds = (pub && pub.credentials) || [];
-  const cap = (pub && pub.maxBotsPerCred) || 4;
+  const cap = (pub && pub.maxBotsPerCred) || 1;
+  // 一个凭证只对应一个机器人：已经绑了机器人的凭证，在"新增/换绑"时不能再选
   const initialId = (pub && pub.initialBotId) || "";
   const isInitial = !!(bot && bot.id === initialId);
   const cur = bot ? (bot.credential || ("implicit-" + initialId)) : "";
@@ -1731,7 +1732,7 @@ function credOptions(bot, pub) {
   return head + creds.map(function (c) {
     const used = (c.bots || []).map(function (x) { return (x && x.id) ? x.id : x; }).filter(function (x) { return x !== initialId; }).length;
     const full = used >= cap && c.id !== cur;
-    const label = esc(c.label || c.id) + "（" + used + "/" + cap + (full ? " 已满" : "") + "）";
+    const label = esc(c.label || c.id) + "（" + used + "/" + cap + (full ? " 已占用" : " 可用") + "）";
     return '<option value="' + esc(c.id) + '"' + (c.id === cur ? " selected" : "") + (full ? " disabled" : "") + ">" + label + "</option>";
   }).join("");
 }
@@ -1742,7 +1743,7 @@ function renderCreds(list, maxPer) {
     const hint = document.getElementById('cred-hint');
     const sel = document.getElementById('nb-cred');
     const cap = maxPer || 4;
-    if (hint) hint.textContent = '最多 ' + cap + ' 个机器人';
+    if (hint) hint.textContent = '一个凭证对应一个机器人';
     /**
      * ⛔ 这里原来自己拼了一套选项（`c.bots.length + '/' + cap`），
      *    结果是：① 计数把**初始机器人**也算进去了（显示 1/4，其实还能建 4 个）；

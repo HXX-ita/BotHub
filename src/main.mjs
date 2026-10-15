@@ -475,7 +475,11 @@ const hub = {
         const initialId = String(rawNow.bots[0].id || '');
         const wantCred = (input && input.credential) ? String(input.credential) : ('implicit-' + initialId);
         const used = rawNow.bots.filter((b) => (b.credential || ('implicit-' + initialId)) === wantCred && b.id !== initialId).length;
-        const cap = 4;
+        // 老板 2026-10-16：一个凭证只对应一个机器人；初始凭据只属于初始机器人
+        const cap = 1;
+        if (wantCred === ('implicit-' + initialId)) {
+          return { ok: false, error: '初始凭据只能给初始机器人用 —— 要建新机器人请先「+ 新增凭证」' };
+        }
         if (used >= cap) {
           return { ok: false, error: `凭据 ${wantCred} 已经满了（${used}/${cap}，初始机器人不算）—— 先点「+ 新增凭证」，再用新凭据建机器人` };
         }

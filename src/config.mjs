@@ -45,7 +45,11 @@ export function loadConfig() {
    *    表现就是当初那个"时好时坏、有时不理人"）。所以同一个凭证下的 4 个机器人
    *    **共用一条连接**：第一个启用的当"连接者"，其余按**群/私聊白名单分流**。
    */
-  const MAX_BOTS_PER_CRED = 4;
+  /**
+ * 一个凭证**只对应一个机器人**（老板 2026-10-16 定的：不做"一个凭证挂多个"了）。
+ * 初始凭据是初始机器人自带的，也只能属于它 —— 见下面计数时排除 initialBotId。
+ */
+const MAX_BOTS_PER_CRED = 1;
   const credentialWarnings = [];
   const keyWarnings = [];          // 通道 key 没填：提醒，不算错   // 凭据没填：提醒，不算错
   const channels = new Map();
@@ -248,7 +252,7 @@ export function loadConfig() {
       const countWithoutInitial = arr.filter((x) => x.id !== initialBotId).length;
       if (countWithoutInitial > MAX_BOTS_PER_CRED) {
         const e = new Error('配置有问题：\n  - 凭证 ' + b.credential + ' 挂了 ' + arr.length + ' 个机器人（' + arr.map((x) => x.id).join('、') + '）—— ' +
-          '一个凭证最多 ' + MAX_BOTS_PER_CRED + ' 个（初始机器人不算在内）。多出来的请另开一个凭证（面板上「+ 新增凭证」）。');
+          '一个凭证只能绑 ' + MAX_BOTS_PER_CRED + ' 个机器人（初始凭据只能属于初始机器人）。要给别的机器人用，请另开一个凭证（面板上「+ 新增凭证」）。');
         e.configErrors = [e.message];
         throw e;
       }
@@ -338,7 +342,9 @@ export function publicConfig(cfg) {
     http: cfg.http,
     /** 凭证清单（只给 id/名字/掩码；明文永远不出这个函数）+ 每条凭证挂了哪些机器人 */
     credentials: cfg.credentialList || [],
-    maxBotsPerCred: 4,
+    // ⛔ 别硬编码！这里原来写死 4，常量改成 1 之后界面还在按 4 判断"满没满"，
+    //    于是"一个凭证一个机器人"在**界面上是失效的**（下拉不禁用、还能选到已占用的凭据）。
+    maxBotsPerCred: MAX_BOTS_PER_CRED,
     // 初始机器人 = Map 里的第一个（= 配置文件里的第一个）。界面靠它判断「初始机器人不占配额」。
     // ⛔ 这里**不能**直接写 initialBotId —— 那个常量在 loadConfig 的局部作用域里，
     //    在 publicConfig 里是未定义的（实测 doctor 直接报 "initialBotId is not defined"）。
