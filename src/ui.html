@@ -754,15 +754,42 @@ async function refresh(){
     || (aeNow && /^(INPUT|TEXTAREA|SELECT)$/.test(aeNow.tagName) && box.contains(aeNow)));
   // ⚠️ 连**展开状态**一起记住：DOM 节点搬家时 open 属性有时会掉，显式带回来最稳
   box.querySelectorAll('details.botcfg').forEach((d) => keepCfg.set(d.dataset.cfgbot, { node: d, open: d.open }));
-  if (botsBusy) { /* 用户在配置 → 不重画（保留内容/光标/展开状态） */ } else box.innerHTML = '';
+  if (botsBusy) {
+    /**
+     * 用户在配置 → **不重建 DOM**（否则会闪、会丢输入），
+     * 但"头上/状态行"这些**该跟着变的信息必须就地更新** ——
+     * 老板原话：「配置更新了，别的信息也要跟着一起啊」。
+     * 所以：状态点、通道/模型标签、收到/回了/最后收到/排队/最后出错，全部按最新数据改写文字。
+     */
+    for (const b of bots) {
+      const dot = box.querySelector('[data-dot="' + b.id + '"]');
+      if (dot) dot.className = 'dot ' + (b.running ? 'ok' : 'bad');
+      const tc = box.querySelector('[data-tagchan="' + b.id + '"]');
+      if (tc) tc.textContent = b.channel || '';
+      const tm = box.querySelector('[data-tagmodel="' + b.id + '"]');
+      if (tm) {
+        tm.textContent = (b.modelPinned ? '指定 ' : '') + (b.model || '');
+        tm.title = b.modelPinned ? '面板上钉住了这个模型（插件轮切会被绕过）' : '跟随 DSH 默认（免费插件的自动轮切生效）';
+      }
+      const cnt = document.getElementById('cnt-' + b.id);
+      if (cnt) {
+        const q = b.queue || {};
+        cnt.innerHTML = `收到 <b>${b.messagesIn}</b> 条 · 回了 <b>${b.repliesOut}</b> 条 · 最后收到 <b>${ago(b.lastMessageSecAgo)}</b>`
+          + (q.busyLanes || q.queued ? `<br>正在处理 <b>${q.busyLanes}</b> 条 · 排队 <b>${q.queued}</b> 条` : '')
+          + (b.lastError ? `<br><span class="badmsg">最后出错：${esc(b.lastError)}</span>` : '');
+      }
+      const pn = document.getElementById('pn-' + b.id);
+      if (pn) pn.textContent = b.alias || b.id;
+    }
+  } else box.innerHTML = '';
   for (const b of (botsBusy ? [] : bots)) {
     const q = b.queue || {};
     const c = document.createElement('div'); c.className = 'card';
     c.innerHTML = `
-      <h3><span class="dot ${b.running?'ok':'bad'}" style="width:10px;height:10px"></span><span class="prof-name" id="pn-${esc(b.id)}">${esc(b.alias || b.id)}</span>
-        <span class="tag">${esc(b.channel)}</span><span class="tag" title="${b.modelPinned ? '面板上钉住了这个模型（插件轮切会被绕过）' : '跟随 DSH 默认（免费插件的自动轮切生效）'}">${b.modelPinned ? '指定 ' : ''}${esc(b.model || '')}</span>${qBtn('prof')}</h3>
+      <h3><span class="dot ${b.running?'ok':'bad'}" data-dot="${esc(b.id)}" style="width:10px;height:10px"></span><span class="prof-name" id="pn-${esc(b.id)}">${esc(b.alias || b.id)}</span>
+        <span class="tag" data-tagchan="${esc(b.id)}">${esc(b.channel)}</span><span class="tag" data-tagmodel="${esc(b.id)}" title="${b.modelPinned ? '面板上钉住了这个模型（插件轮切会被绕过）' : '跟随 DSH 默认（免费插件的自动轮切生效）'}">${b.modelPinned ? '指定 ' : ''}${esc(b.model || '')}</span>${qBtn('prof')}</h3>
       <div class="prof" id="prof-${esc(b.id)}"></div>
-      <div class="line">
+      <div class="line" id="cnt-${esc(b.id)}">
         收到 <b>${b.messagesIn}</b> 条 · 回了 <b>${b.repliesOut}</b> 条 · 最后收到 <b>${ago(b.lastMessageSecAgo)}</b>
         ${q.busyLanes||q.queued ? `<br>正在处理 <b>${q.busyLanes}</b> 条 · 排队 <b>${q.queued}</b> 条` : ''}
         ${b.lastError ? `<br><span class="badmsg">最后出错：${esc(b.lastError)}</span>` : ''}
