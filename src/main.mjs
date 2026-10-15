@@ -1095,3 +1095,23 @@ process.on('SIGHUP', bye);
 
 log.info(`BotHub 已启动：pid ${process.pid}，${bots.length} 个机器人，面板 http://${cfg.http.host}:${port}/`);
 log.info(`机器：${os.hostname()} / Node ${process.version}`);
+
+/**
+ * ★ 每次启动都**强制重取一次平台资料**（老板要求：
+ *   "如果用户把机器人的平台名和头像换掉了，本软件在每次重启的时候都要及时更新最新的头像和平台名"）。
+ *
+ * 为什么不能只靠缓存：`data/profiles.json` 里存的是上次拿到的名字/头像，
+ * 用户在 QQ 开放平台改了名字或头像之后，不点「刷新资料」面板就一直显示旧的。
+ * 所以启动后（等几秒让网关连上）挨个 force 拉一次；**拉失败就保留旧缓存**（不清空，免得面板变空白）。
+ */
+setTimeout(async () => {
+  for (const b of bots) {
+    try {
+      const r = await hub.botProfile(b.cfg.id, { force: true });
+      if (r && !r.error) log.info(`[${b.cfg.id}] 已更新平台资料：${r.platformName || '(没名字)'}${r.avatar ? '（有头像）' : ''}`);
+      else log.warn(`[${b.cfg.id}] 启动时取平台资料没成功（保留上次的）：${(r && r.error) || '未知原因'}`);
+    } catch (e) {
+      log.warn(`[${b.cfg.id}] 启动时取平台资料出错（保留上次的）：${e && e.message}`);
+    }
+  }
+}, 8000);
