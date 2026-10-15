@@ -408,6 +408,14 @@
      ══════════════════════════════════════════════════════════════ */
   [hidden]{display:none !important}
 
+  /* 删除机器人：红字白底（老板：“字用红白色”）；悬停/按下填充红底白字，跟“删指令”一致 */
+  /* 用 #bots 提高优先级：普通按钮的 color 规则会盖掉单纯的 button.delbot */
+  #bots button.delbot{color:#d93025 !important;background:var(--card);border-color:#f0c4c0;font-weight:600}
+  #bots button.delbot:hover{background:#d93025 !important;color:#fff !important;border-color:transparent}
+  #bots button.delbot:active{background:#a51d17 !important;color:#fff !important;border-color:transparent}
+  button.delbot:hover{background:#d93025;color:#fff;border-color:transparent}
+  button.delbot:active{background:#a51d17;color:#fff;border-color:transparent}
+  html[data-theme="dark"] button.delbot{background:var(--btnbg);border-color:#5a2b28}
 </style>
 </head>
 <body>
@@ -845,6 +853,7 @@ async function refresh(){
         <button class="act" data-kick="${esc(b.id)}">断开重连</button>
         <button class="act" data-logs="${esc(b.id)}">看日志</button>
         <button class="ghost" data-prof="${esc(b.id)}" title="重新从平台取一次资料">刷新资料</button>
+        ${(b.id === (PUB && PUB.initialBotId) || (bots[0] && b.id === bots[0].id)) ? "" : `<button class="delbot" data-delbot="${esc(b.id)}" title="把这个机器人从配置里删掉（初始机器人不可删）">删除</button>`}
         
       </div>
       <pre id="log-${esc(b.id)}" style="display:none"></pre>`;

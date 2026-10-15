@@ -428,6 +428,25 @@ const hub = {
    *   · cloud → 新建一条 openai 通道（要 baseURL/model/key）
    *   · local → 同上，但默认指向本机推理服务（Ollama / LM Studio 那类兼容接口）
    */
+  /**
+   * 删掉一个机器人（老板要的“删除按钮”）。
+   * ⛔ 两条保护：① **初始机器人不许删**（它是配置里的第一个，删了整台机器都读不出来）；
+   *              ② 删完不自动重启，界面提示“点重启应用生效”（跟别的配置修改一致）。
+   */
+  async removeBot(id) {
+    let raw = null;
+    try { raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { return { ok: false, error: '读不到配置文件' }; }
+    if (!raw || !Array.isArray(raw.bots)) return { ok: false, error: '配置里没有机器人列表' };
+    const initialId = String((raw.bots[0] && raw.bots[0].id) || '');
+    if (String(id) === initialId) return { ok: false, error: '「' + initialId + '」是初始机器人，不能删。要停用它请清空凭据或删掉它的连接方式。' };
+    const before = raw.bots.length;
+    raw.bots = raw.bots.filter((b) => b && String(b.id) !== String(id));
+    if (raw.bots.length === before) return { ok: false, error: '没有叫 ' + id + ' 的机器人' };
+    const r = saveConfigText(JSON.stringify(raw, null, 2));
+    if (!r || r.ok === false) return { ok: false, error: (r && r.error) || '写配置失败' };
+    log.info("已删除机器人 " + id + "（点「重启应用」后彻底生效）");
+    return { ok: true, note: "已删除 " + id + " —— 点左侧「重启应用」生效" };
+  },
   async addBot(input) {
     /**
      * 老板的规则：一个凭据挂满 4 个（**初始机器人不算**）之后，就不能再用它建新机器人。

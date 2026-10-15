@@ -156,7 +156,12 @@ export function startWeb({ port, host, hub, log }) {
        */
       {
         const readJsonBody = async () => { let raw = ''; for await (const chunk of req) raw += chunk; return JSON.parse(raw || '{}'); };
-        if (req.method === 'POST' && url.pathname === '/api/bots/new') {
+        /** 删除机器人：POST /api/bots/<id>/delete */
+      {
+        const m = /^\/api\/bots\/([^/]+)\/delete$/.exec(url.pathname);
+        if (req.method === 'POST' && m) return json(res, await hub.removeBot(decodeURIComponent(m[1])));
+      }
+      if (req.method === 'POST' && url.pathname === '/api/bots/new') {
           return json(res, await hub.addBot(await readJsonBody()));
         }
         if (req.method === 'POST' && url.pathname === '/api/credentials/new') {
