@@ -491,6 +491,12 @@
             <input id="nb-model" style="flex:1" placeholder="模型名">
             <input id="nb-key" style="flex:1" placeholder="${ENV:OPENAI_API_KEY}">
           </div></label>
+        <!-- 老板说"创建机器人对应的应该是平台那个按钮" → 给一个直达入口（新机器人 = 平台上真的新建一个） -->
+        <p class="hint" style="margin:0 0 10px">
+          每个机器人对应 QQ 开放平台上<b>一个真的机器人</b>：先去
+          <a href="https://q.qq.com/qqbot/dashboard/" target="_blank" rel="noreferrer">QQ 开放平台 · 我的机器人</a>
+          点「创建机器人」，拿到它的 AppID / AppSecret，再回这里填。
+        </p>
         <div class="row">
           <button class="primary" id="nb-go">创建</button>
           <span class="hint" id="nb-msg"></span>
@@ -1153,7 +1159,12 @@ async function fillModelSelect(i) {
     provs.add(pr.id);
     for (const id of (pr.models || [])) opts.push({ v: id, label: (pr.displayName || pr.id) + ' · ' + id });
   }
-  if (m && m.openai) for (const id of (m.openai.models || [])) opts.push({ v: id, label: m.openai.channel + ' · ' + id });
+  /**
+   * 云端通道的模型**只给云端/本地的机器人**看；DSH 的机器人不该在这里看到它们
+   * （老板："模型通道、模型、供应商不该出现 dsh 可提供列表之外的选项"）。
+   */
+  const myKind = kindOfChannel(cfgBots[i] ? cfgBots[i].channel : "");
+  if (m && m.openai && myKind !== "dsh") for (const id of (m.openai.models || [])) opts.push({ v: id, label: m.openai.channel + ' · ' + id });
   const cur = cfgBots[i].model || '';
   const uniq = [...new Set(opts.map((o) => o.v))];
   sel.innerHTML = '<option value="">跟随 DSH（自动轮切）</option>'
@@ -1199,7 +1210,12 @@ async function loadCfg(){
     cfgLoaded = true; cfgLoadedAt = Date.now(); return;
   }
   const bots = cfg.bots || [];
-  const chans = (cfg.channels || []).map(c => c.id);
+  /**
+   * 注意：`chans` 是**函数级**的（所有机器人共用这份候选）。
+   * 按"这台机器人是什么类型"过滤要放到**模板里**做（那里才有 b）——
+   * 我第一版把 per-bot 的过滤写在函数级，直接 ReferenceError: b is not defined（页面白）。
+   */
+  const chans = (cfg.channels || []).map((c) => c.id);
   /**
    * 每个机器人的配置块（**放在「机器人」页那张卡里、做实心下拉**；老板要求）。
    * ⚠️ 生成好先缓存进 `cfgBlocks`，由 renderBots 挂到对应机器人卡上 ——
@@ -1221,9 +1237,10 @@ async function loadCfg(){
       <div class="grid2">
         <!-- 老板要的：每个机器人可以在**自己的配置里**选凭据 -->
         <label class="f"><span>用哪个凭据</span>
-          <select data-i="${i}" data-k="credential"${b.id === (PUB && PUB.initialBotId) ? ' disabled title="初始机器人的凭据是它自带的，不能改"' : ''}>${credOptions(b, PUB)}</select></label>
+          ${/* 老板要求：**凭据只能在新建机器人时选**，配置界面里不可选（只展示当前这条） */''}
+          <select data-i="${i}" data-k="credential" disabled title="凭据在「新增机器人」时选定，这里只展示；要换请新建一个机器人">${credOptions(b, PUB)}</select></label>
         <label class="f"><span>模型通道</span>
-          <select data-i="${i}" data-k="channel">${chans.map(c => `<option ${c===b.channel?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+          <select data-i="${i}" data-k="channel">${chans.filter(c => (kindOfChannel(b.channel) === 'dsh' ? kindOfChannel(c) === 'dsh' : c === b.channel)).map(c => `<option ${c===b.channel?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
         <label class="f"><span>模型</span>
           ${/* 老板要求：这里的"展开框"要跟别处**长得一样** → 用 select，不再用 input+datalist */''}
           <select data-i="${i}" data-k="model"><option value="">跟随 DSH（自动轮切）</option></select></label>
@@ -1598,6 +1615,21 @@ function applyChannelLogic(scope) {
       const lab = el.closest("label.f") || el;
       lab.hidden = !isDsh;                 // 不是 DSH 就不显示
       el.disabled = !isDsh;                // 顺带禁用，免得还能用键盘填
+    }
+    /**
+     * 老板要求：**云端/本地建的机器人，配置里"模型通道"和"模型"都不给选** ——
+     * 因为接口/模型/密钥在新建时就填过了，配置里再改只会和通道里的设置打架。
+     * DSH 的机器人保留可改（他要在 DSH 的模型清单里挑）。
+     */
+    const cloudLock = !isDsh;
+    const chLab = cs.closest("label.f");
+    cs.disabled = cloudLock;
+    if (chLab) chLab.title = cloudLock ? "云端/本地模型在新建时就定了连接方式；要改请新建一个机器人" : "";
+    const mSel = blk.querySelector('select[data-k="model"]');
+    if (mSel) {
+      mSel.disabled = cloudLock;
+      const mLab = mSel.closest("label.f") || mSel;
+      mLab.title = cloudLock ? "模型在新建时填过（跟着通道走）；要改请新建一个机器人" : "";
     }
     // 模型/供应商：DSH 用 DSH 的清单，云端用通道的模型名 —— 两个都留着，但 DSH 下供应商没意义
     const pv = blk.querySelector('select[data-k="provider"]');
