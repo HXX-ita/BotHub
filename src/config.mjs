@@ -33,6 +33,12 @@ export const CONFIG_PATH = process.env.BOTHUB_CONFIG || path.join(ROOT, 'config'
 
 const isStr = (v) => typeof v === 'string' && v.trim() !== '';
 
+/**
+ * 一个凭证只对应一个机器人（老板 2026-10-16 定的）。
+ * ⛔ 必须在**模块顶层**：publicConfig() 和 loadConfig() 都要用它。
+ */
+const MAX_BOTS_PER_CRED = 1;
+
 export function loadConfig() {
   const cfg = readJson(CONFIG_PATH);
   if (!cfg) throw new Error(`读不到配置或不是合法 JSON：${CONFIG_PATH}`);
@@ -46,10 +52,11 @@ export function loadConfig() {
    *    **共用一条连接**：第一个启用的当"连接者"，其余按**群/私聊白名单分流**。
    */
   /**
- * 一个凭证**只对应一个机器人**（老板 2026-10-16 定的：不做"一个凭证挂多个"了）。
- * 初始凭据是初始机器人自带的，也只能属于它 —— 见下面计数时排除 initialBotId。
- */
-const MAX_BOTS_PER_CRED = 1;
+   * 一个凭证**只对应一个机器人**（老板 2026-10-16 定的：不做"一个凭证挂多个"了）。
+   * ⛔ 常量定义在**模块顶层**（文件上方）——`publicConfig()` 也要用它，
+   *    放在这个函数里的话那边会 ReferenceError（实测：/api/config 返回
+   *    {"error":"MAX_BOTS_PER_CRED is not defined"}，界面凭据清单直接空掉）。
+   */
   const credentialWarnings = [];
   const keyWarnings = [];          // 通道 key 没填：提醒，不算错   // 凭据没填：提醒，不算错
   const channels = new Map();

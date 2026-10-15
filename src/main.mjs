@@ -457,6 +457,20 @@ const hub = {
     if (String(id) === initialId) return { ok: false, error: '「' + initialId + '」是初始机器人，不能删。要停用它请清空凭据或删掉它的连接方式。' };
     const before = raw.bots.length;
     raw.bots = raw.bots.filter((b) => b && String(b.id) !== String(id));
+    /**
+     * 顺手把它**专用的通道也删掉**（老板报过"删了机器人，云端通道还留在列表里"）。
+     * 判定：这个通道没有别的机器人在用，而且**不是初始机器人那条**（dsh-local 那种要留着）。
+     */
+    try {
+      const gone = raw.bots_before_for_del || null;
+      const alive = new Set(raw.bots.map((b) => b.channel));
+      const initialChan = (raw.bots[0] && raw.bots[0].channel) || null;
+      if (Array.isArray(raw.channels)) {
+        const before = raw.channels.length;
+        raw.channels = raw.channels.filter((c) => !c || alive.has(c.id) || c.id === initialChan);
+        if (raw.channels.length !== before) log.info("顺带清掉了没人用的通道：" + (before - raw.channels.length) + " 个");
+      }
+    } catch { /* 清不掉也不影响删机器人 */ }
     if (raw.bots.length === before) return { ok: false, error: '没有叫 ' + id + ' 的机器人' };
     const r = saveConfigText(JSON.stringify(raw, null, 2));
     if (!r || r.ok === false) return { ok: false, error: (r && r.error) || '写配置失败' };
