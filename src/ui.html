@@ -1124,37 +1124,50 @@ const cmdRowHtml = (c) => {
     </div>`;
 };
 const cfgBots = (JSON.parse(cfgRaw).bots) || [];
-for (let i = 0; i < cfgBots.length; i++) {
-  const box = document.getElementById('cmds-' + i);
-  if (!box) continue;
-  box.dataset.i = String(i);
-  box.innerHTML = (cfgBots[i].commands || []).map(cmdRowHtml).join('');
-}
-// 开关一拨就让那行变灰（立刻看得出"这条现在是停用的"，不用等保存）
-const wireCmdSwitches = (root) => root.querySelectorAll('.cmdrow [data-c="enabled"]').forEach(sw => {
-  sw.onchange = () => sw.closest('.cmdrow').classList.toggle('off', !sw.checked);
-});
-wireCmdSwitches(document);
 /**
- * 模型选项：拉这个机器人能用的模型，塞进 datalist（可下拉选、也可手填）。
- * 列表来自 DSH 自己的配置（他装了什么插件、有什么免费模型，这里就有什么）或 openai 通道的 /models。
+ * 模型选项：拉这个机器人能用的模型，塞进**下拉框**（跟其它字段长得一样，老板要求统一）。
+ * ⛔ 老板报过："选过一次模型后，哪怕把通道换了，模型也换不了了" ——
+ *    因为换通道时**没人重新拉模型**。所以这里做成可重复调用的 fillModelSelect(i)，
+ *    通道一变就重新拉一次（原来的值如果还在列表里就保留，不在就回到"跟随 DSH"）。
  */
+async function fillModelSelect(i) {
+  const sel = document.querySelector('.botcfg select[data-k="model"][data-i="' + i + '"]');
+  if (!sel || !cfgBots[i]) return;
+  const keep = sel.value;
+  let m = null;
+  try { m = await api('/api/models?bot=' + encodeURIComponent(cfgBots[i].id)); } catch { m = null; }
+  const opts = [];
+  const provs = new Set();
+  for (const pr of ((m && m.providers) || [])) {
+    provs.add(pr.id);
+    for (const id of (pr.models || [])) opts.push({ v: id, label: (pr.displayName || pr.id) + ' · ' + id });
+  }
+  if (m && m.openai) for (const id of (m.openai.models || [])) opts.push({ v: id, label: m.openai.channel + ' · ' + id });
+  const cur = cfgBots[i].model || '';
+  const uniq = [...new Set(opts.map((o) => o.v))];
+  sel.innerHTML = '<option value="">跟随 DSH（自动轮切）</option>'
+    + uniq.map((v) => {
+        const o = opts.find((x) => x.v === v);
+        return '<option value="' + esc(v) + '">' + esc(o.label) + '</option>';
+      }).join('')
+    + (cur && !uniq.includes(cur) ? '<option value="' + esc(cur) + '">' + esc(cur) + '（当前，不在清单里）</option>' : '');
+  sel.value = uniq.includes(keep) ? keep : cur;
+  const pv = document.querySelector('.botcfg select[data-k="provider"][data-i="' + i + '"]');
+  if (pv) {
+    const pcur = cfgBots[i].provider || '';
+    pv.innerHTML = '<option value="">跟随默认</option>'
+      + [...provs].map((x) => '<option value="' + esc(x) + '">' + esc(x) + '</option>').join('')
+      + (pcur && !provs.has(pcur) ? '<option value="' + esc(pcur) + '">' + esc(pcur) + '（当前）</option>' : '');
+    pv.value = pcur;
+  }
+}
 for (let i = 0; i < cfgBots.length; i++) {
-  (async () => {
-    const dl = document.getElementById('ml-' + i);
-    if (!dl) return;
-    const m = await api('/api/models?bot=' + encodeURIComponent(cfgBots[i].id));
-    const opts = [];
-    const provs = new Set();
-    for (const p of (m.providers || [])) {
-      provs.add(p.id);
-      for (const id of (p.models || [])) opts.push({ v: id, label: `${p.displayName || p.id} · ${id}` });
-    }
-    if (m.openai) for (const id of (m.openai.models || [])) opts.push({ v: id, label: `${m.openai.channel} · ${id}` });
-    dl.innerHTML = opts.map((o) => `<option value="${esc(o.v)}">${esc(o.label)}</option>`).join('');
-    const pv = document.getElementById('pv-' + i);
-    if (pv) pv.innerHTML = [...provs].map((p) => `<option value="${esc(p)}"></option>`).join('');
-  })();
+  fillModelSelect(i);
+  /**
+   * 换通道 → **重新拉一次模型清单**（不然模型下拉还是旧通道的，等于换不了）。
+   */
+  const chanSel = document.querySelector('.botcfg select[data-k="channel"][data-i="' + i + '"]');
+  if (chanSel) chanSel.addEventListener('change', () => { cfgBots[i].channel = chanSel.value; fillModelSelect(i); });
 }
 document.querySelectorAll('.botcfg [data-addcmd]').forEach(btn => btn.onclick = () => {
   const box = document.getElementById('cmds-' + btn.dataset.addcmd);
@@ -1197,17 +1210,16 @@ async function loadCfg(){
       <div class="grid2">
         <!-- 老板要的：每个机器人可以在**自己的配置里**选凭据 -->
         <label class="f"><span>用哪个凭据</span>
-          <select data-i="${i}" data-k="credential">${credOptions(b, PUB)}</select></label>
+          <select data-i="${i}" data-k="credential"${b.id === (PUB && PUB.initialBotId) ? ' disabled title="初始机器人的凭据是它自带的，不能改"' : ''}>${credOptions(b, PUB)}</select></label>
         <label class="f"><span>模型通道</span>
           <select data-i="${i}" data-k="channel">${chans.map(c => `<option ${c===b.channel?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
         <label class="f"><span>模型</span>
-          <input data-i="${i}" data-k="model" list="ml-${i}" value="${esc(b.model || '')}" placeholder="留空＝跟随 DSH（插件自动轮切）">
-          <datalist id="ml-${i}"></datalist></label>
+          ${/* 老板要求：这里的"展开框"要跟别处**长得一样** → 用 select，不再用 input+datalist */''}
+          <select data-i="${i}" data-k="model"><option value="">跟随 DSH（自动轮切）</option></select></label>
       </div>
       <div class="grid2">
         <label class="f"><span>供应商</span>
-          <input data-i="${i}" data-k="provider" list="pv-${i}" value="${esc(b.provider || '')}" placeholder="跟随默认">
-          <datalist id="pv-${i}"></datalist></label>
+          <select data-i="${i}" data-k="provider"><option value="">跟随默认</option></select></label>
         <label class="f"><span>推理等级</span>
           <select data-i="${i}" data-k="reasoningEffort">
             <option value="" ${!b.reasoningEffort ? 'selected' : ''}>跟随 DSH</option>
@@ -1324,6 +1336,8 @@ async function saveAllBots(btn) {
     const i = Number(el.dataset.i), k = el.dataset.k;
     let v = el.value;
     if (k === 'mentionRequired' || k === 'noTools') v = (v === 'true');
+    // 初始机器人的凭据是自带的，界面上锁死了 —— 保存时**不写**这个字段（免得写上一个显式值）
+    if (k === 'credential' && cfg2.bots[i] && PUB && cfg2.bots[i].id === PUB.initialBotId) return;
     if (k === 'limits.perPeerPerMin') { cfg2.bots[i].limits = cfg2.bots[i].limits || {}; cfg2.bots[i].limits.perPeerPerMin = Number(v) || 8; return; }
     if (k === 'queue.maxProcessingMs') { cfg2.bots[i].queue = cfg2.bots[i].queue || {}; cfg2.bots[i].queue.maxProcessingMs = (Number(v) || 300) * 1000; return; }
     cfg2.bots[i][k] = v;
@@ -1555,7 +1569,12 @@ function credOptions(bot, pub) {
   const initialId = (pub && pub.initialBotId) || "";
   const isInitial = !!(bot && bot.id === initialId);
   const cur = bot ? (bot.credential || ("implicit-" + initialId)) : "";
-  const head = isInitial ? '<option value="">初始机器人（不占配额）</option>' : "";
+  /**
+   * 初始机器人：凭据**锁死**（老板："初始机器人在凭证选择的那一栏应该是无法选择的"）。
+   * 它的凭据就是它自带的那条，界面上只展示、不给选。
+   */
+  if (isInitial) return '<option value="' + esc(cur) + '" selected>' + esc((bot && bot.credentialLabel) || "初始凭据（自带，不可改）") + "</option>";
+  const head = "";
   if (!creds.length) return head + '<option value="">（还没有凭据）</option>';
   return head + creds.map(function (c) {
     const used = (c.bots || []).map(function (x) { return (x && x.id) ? x.id : x; }).filter(function (x) { return x !== initialId; }).length;
