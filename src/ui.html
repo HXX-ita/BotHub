@@ -1793,7 +1793,8 @@ function renderCreds(list, maxPer) {
     const hint = document.getElementById('cred-hint');
     const sel = document.getElementById('nb-cred');
     const cap = maxPer || 4;
-    if (hint) hint.textContent = '一个凭证对应一个机器人';
+    // 老板要求：连「最多 1 个机器人」这种说明也不要了 —— 标题就写「凭证」
+    if (hint) hint.textContent = '';
     /**
      * ⛔ 这里原来自己拼了一套选项（`c.bots.length + '/' + cap`），
      *    结果是：① 计数把**初始机器人**也算进去了（显示 1/4，其实还能建 4 个）；
@@ -1808,7 +1809,8 @@ function renderCreds(list, maxPer) {
     }
     box.innerHTML = credCache.map((c) => (
       '<div class="credrow" data-credrow="' + esc(c.id) + '">' +
-        '<div class="who"><b>' + esc(c.label) + '</b><div class="cnt">' + esc(c.id) + ' · 挂了 ' + c.bots.length + '/' + cap + ' 个' + (c.bots.length ? '：' + c.bots.map(esc).join('、') : '') + '</div></div>' +
+        /* 老板要求：不要 `implicit-qq-main · 挂了 1/1 个：qq-main` 这种技术行 —— 只留名字和"填没填" */
+        '<div class="who"><b>' + esc(c.label) + '</b></div>' +
         '<div class="cnt">' + (c.missing ? '<span class="badmsg">还没填值</span>' : esc(c.appIdShown || '已填')) + '</div>' +
         '<div class="row" style="gap:8px">' +
           '<input data-cid="' + esc(c.id) + '" data-f="appId" placeholder="appId">' +
