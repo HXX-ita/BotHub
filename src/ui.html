@@ -384,6 +384,20 @@
     margin-bottom:0;
   }
 
+
+  /* ══════════════════════════════════════════════════════════════
+     机器人卡内的竖直节奏（老板："这一排按钮离下面的配置框太近了"）
+     ──────────────────────────────────────────────────────────────
+     实测原来是：按钮行 → 配置框 **0px**（贴着），其它处 10px / 43px 各说各话。
+     统一成设计令牌那一档：段与段之间 14px（--sp3），标题与内容 10px（--sp2）。
+     ══════════════════════════════════════════════════════════════ */
+  #bots .card > h3{margin:0 0 var(--sp2)}
+  #bots .card > .prof{margin-bottom:var(--sp2)}
+  #bots .card > .line{margin:var(--sp2) 0 0}
+  #bots .card > .btns{margin-top:var(--sp3)}
+  #bots details.botcfg{margin-top:var(--sp3)}     /* ⬅ 老板点名要拉开的地方 */
+  #bots .card > pre{margin:var(--sp3) 0 0}
+
 </style>
 </head>
 <body>
