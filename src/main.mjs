@@ -52,6 +52,22 @@ saveRuntimeInfo();
 
 const PROFILE_FILE = path.join(DATA, 'profiles.json');
 const profileStore = readJson(PROFILE_FILE, {}) || {};
+/**
+ * ⛔ 老板报"机器人都删掉了，状态页为啥不更新" —— 因为状态页读的是这份**资料缓存**，
+ *    而删机器人时没人清它的资料 → 早删掉的 aaa/sss 一直挂在状态页上。
+ *    这里启动时剔掉不在配置里的键，并且**落盘**（不留残渣）。
+ */
+{
+  try {
+    const ids = new Set([...cfg.bots.keys()]);
+    const dropped = Object.keys(profileStore).filter((k) => !ids.has(k));
+    if (dropped.length) {
+      for (const k of dropped) delete profileStore[k];
+      writeJson(PROFILE_FILE, profileStore);
+      log.info("清掉已删除机器人的资料缓存：" + dropped.join("、"));
+    }
+  } catch (e) { log.warn("清理资料缓存失败（不影响运行）：" + (e && e.message)); }
+}
 
 /**
  * 取"某个机器人自己的会话库"。

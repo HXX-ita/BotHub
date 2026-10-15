@@ -769,6 +769,14 @@ async function refresh(){
     setFoot(null, (problem ? '有需要注意的地方 · ' : '机器人已连接 · ') + bits.join(' · '));
   }
 
+  /**
+   * 只渲染**当前还在配置里**的机器人（老板报"删了还挂在状态页"）：
+   *   profById 是"资料缓存"，删机器人时它可能还留着旧键 → 这里按当前机器人名单过一遍。
+   */
+  {
+    const alive = new Set((st.bots || []).map((b) => b.id));
+    for (const k of Object.keys(profById)) if (!alive.has(k)) delete profById[k];
+  }
   renderHeroProfile();
   /**
    * 左下角那行状态**只写一次**（前面 setFoot 已经把"连接状态 + 细节"写好了）。
