@@ -1779,7 +1779,14 @@ function credOptions(bot, pub) {
   if (isInitial) return '<option value="' + esc(cur) + '" selected>' + esc((bot && bot.credentialLabel) || "初始凭据（自带，不可改）") + "</option>";
   const head = "";
   if (!creds.length) return head + '<option value="">（还没有凭据）</option>';
-  return head + creds.map(function (c) {
+  return head + creds.filter(function (c) {
+    /**
+     * 老板要求：「初始凭证只能绑初始机器人，新建机器人不能再用它了」。
+     * 这条**自带凭据**在别人的下拉里**根本不出现**（后端也会拒绝，界面就别再给了）；
+     * 只有它自己的机器人（isInitial）才看得到 —— 那种情况上面已经 return 了。
+     */
+    return !(c.implicit || String(c.id) === "implicit-" + initialId);
+  }).map(function (c) {
     const used = (c.bots || []).map(function (x) { return (x && x.id) ? x.id : x; }).filter(function (x) { return x !== initialId; }).length;
     const full = used >= cap && c.id !== cur;
     const label = esc(c.label || c.id) + "（" + used + "/" + cap + (full ? " 已占用" : " 可用") + "）";
