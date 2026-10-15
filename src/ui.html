@@ -410,12 +410,22 @@
 
   /* 删除机器人：红字白底（老板：“字用红白色”）；悬停/按下填充红底白字，跟“删指令”一致 */
   /* 用 #bots 提高优先级：普通按钮的 color 规则会盖掉单纯的 button.delbot */
-  #bots button.delbot{color:#d93025 !important;background:var(--card);border-color:#f0c4c0;font-weight:600}
-  #bots button.delbot:hover{background:#d93025 !important;color:#fff !important;border-color:transparent}
-  #bots button.delbot:active{background:#a51d17 !important;color:#fff !important;border-color:transparent}
+  #bots button.delbot{color:#c0564f !important;background:var(--card);border-color:#eccfcc;font-weight:600}
+  #bots button.delbot:hover{background:#c0564f !important;color:#fff !important;border-color:transparent}
+  #bots button.delbot:active{background:#a0453f !important;color:#fff !important;border-color:transparent}
   button.delbot:hover{background:#d93025;color:#fff;border-color:transparent}
   button.delbot:active{background:#a51d17;color:#fff;border-color:transparent}
   html[data-theme="dark"] button.delbot{background:var(--btnbg);border-color:#5a2b28}
+  /* ⛔ 老板反复报"云端/本地机器人还出现推理等级/操作权限/只聊天"：
+     光靠 JS 加 hidden 会被后面的重绘或样式盖掉 —— 这里按**块上的类型标记**用 CSS 兜死。 */
+  .botcfg[data-botkind="openai"] [data-k="reasoningEffort"],
+  .botcfg[data-botkind="openai"] [data-k="permission"],
+  .botcfg[data-botkind="openai"] [data-k="noTools"],
+  .botcfg[data-botkind="openai"] [data-k="provider"]{display:none !important}
+  .botcfg[data-botkind="openai"] label.f:has([data-k="reasoningEffort"]),
+  .botcfg[data-botkind="openai"] label.f:has([data-k="permission"]),
+  .botcfg[data-botkind="openai"] label.f:has([data-k="noTools"]),
+  .botcfg[data-botkind="openai"] label.f:has([data-k="provider"]){display:none !important}
 </style>
 </head>
 <body>
@@ -880,6 +890,21 @@ async function refresh(){
     b.textContent = r.ok ? '已断开…' : (r.error || '不行');
     setTimeout(() => { b.disabled = false; b.textContent = '断开重连'; refresh(); }, 6000);
   });
+  /**
+   * 删除机器人（老板报"点了没反应"：上一版只加了按钮，**忘了接线**）。
+   * 确认一次 → 调 POST /api/bots/<id>/delete → 弹结果 → 提示点「重启应用」生效。
+   */
+  box.querySelectorAll('[data-delbot]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.delbot;
+    const okDel = confirm('删掉机器人「' + id + '」？\n\n· 会从配置里移除它（不可撤销）\n· 删完点左侧「重启应用」生效');
+    if (!okDel) return;
+    b.disabled = true; const old = b.textContent; b.textContent = '删除中…';
+    let r = null; try { r = await post('/api/bots/' + encodeURIComponent(id) + '/delete'); } catch (e) { r = { ok: false, error: String(e && e.message) }; }
+    b.disabled = false; b.textContent = old;
+    alert(r && r.ok ? (r.note || '已删除') : ('删除失败：' + ((r && r.error) || '未知错误')));
+    if (r && r.ok) { cfgLoaded = false; try { loadCfg(); } catch (e) { console.warn(e); } refresh(); }
+  });
+
   box.querySelectorAll('[data-logs]').forEach(b => b.onclick = async () => {
     const pre = document.getElementById('log-' + b.dataset.logs);
     if (pre.style.display !== 'none') { pre.style.display = 'none'; return; }
@@ -1253,7 +1278,7 @@ async function loadCfg(){
    */
   cfgBlocks.clear();
   bots.forEach((b, i) => cfgBlocks.set(b.id, `
-    <details class="botcfg" data-cfgbot="${esc(b.id)}">
+    <details class="botcfg" data-cfgbot="${esc(b.id)}" data-botkind="${esc(kindOfChannel(b.channel))}">
       <summary>配置 <span class="hint">人格 / 模型 / 权限 / 指令</span></summary>
       <div class="body">
       <div class="grid2">

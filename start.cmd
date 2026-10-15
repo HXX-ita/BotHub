@@ -10,6 +10,7 @@ rem    5. open the panel as a plain window (Edge/Chrome app mode)
 rem
 rem  ASCII-only + CRLF: cmd.exe reads scripts in the OEM codepage.
 rem ===================================================================
+chcp 65001 >nul 2>nul
 setlocal
 cd /d "%~dp0"
 if not exist "data\logs" mkdir "data\logs"
@@ -32,7 +33,10 @@ echo [%DATE% %TIME%] ===== start BotHub ===== >> "%LOG%"
 schtasks /Change /TN "BotHub-Supervisor" /ENABLE >nul 2>&1
 schtasks /Change /TN "BotHub-Ensure" /ENABLE >nul 2>&1
 
-"%NODE%" "tools\start-bothub-supervisor.mjs" --ensure >> "%LOG%" 2>&1
+rem ensure goes to the CONSOLE too: on a cold start this step is the slow one,
+rem and the boss must see *something* happening while it waits.
+echo   - starting the app (first time can take ~10s)...
+"%NODE%" "tools\start-bothub-supervisor.mjs" --ensure
 rem wait for the panel -- goes to the CONSOLE so the user sees the spinning
 rem "starting up" animation (the script logs one line itself).
 echo   - waiting for the panel (first run can take a few seconds)...
