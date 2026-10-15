@@ -957,16 +957,26 @@ let profTimer = null;
 function renderHeroProfile() {
   const box = $('#heroProf');
   if (!box) return;
-  const ids = Object.keys(profById);
+  /**
+   * 老板要求：「这里连不上就不要再显示了」。
+   *   · `stale`（平台连不上、显示的是缓存）→ **不画**；
+   *   · 同一台机器人（平台名 + appId 相同）只画**一张**（多把键指向同一台时不重复）。
+   */
+  const ids = Object.keys(profById).filter((id) => profById[id] && !profById[id].stale);
   if (!ids.length) { box.innerHTML = '<span class="hint">正在取平台资料…</span>'; return; }
-  box.innerHTML = ids.map((id) => {
+  const seen = new Set();
+  const cards = [];
+  for (const id of ids) {
     const p = profById[id];
-    const stale = p.stale ? ` · <span class="badmsg">平台连不上，显示 ${ago(Math.round((Date.now()-p.cachedAt)/1000))}的</span>` : '';
-    return `<span class="hprof">
+    const sig = String(p.platformName || '') + '|' + String(p.appIdShown || p.appIdMasked || '');
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    cards.push(`<span class="hprof">
       ${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : '<span class="avph"></span>'}
-      <span><b>${esc(p.platformName)}</b> <span class="hint">${esc(p.appIdShown || p.appIdMasked)}${stale}</span></span>
-    </span>`;
-  }).join('');
+      <span><b>${esc(p.platformName)}</b> <span class="hint">${esc(p.appIdShown || p.appIdMasked)}</span></span>
+    </span>`);
+  }
+  box.innerHTML = cards.join('') || '<span class="hint">正在取平台资料…</span>';
 }
 
 async function loadProfile(botId, force) {
