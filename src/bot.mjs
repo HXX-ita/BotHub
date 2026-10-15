@@ -66,7 +66,10 @@ export class BotInstance {
     this.dshSessionFile = path.join(DATA, 'dsh-sessions.json');
     try {
       const saved = JSON.parse(fs.readFileSync(this.dshSessionFile, 'utf8'));
-      for (const [k, v] of Object.entries(saved)) this.dshSessions.set(k, v);
+      // 只认带本机器人 id 前缀的键；老的（没有机器人 id 的）**直接忽略** ——
+    // 宁可让它开一个新 DSH 会话（本地历史还在，不丢上下文），也不能跟别的机器人串号。
+    const mine = this.cfg.id + ':';
+    for (const [k, v] of Object.entries(saved)) if (String(k).startsWith(mine)) this.dshSessions.set(k, v);
     } catch { /* 第一次跑，没有这个文件很正常 */ }
     /**
      * ★ 平台适配：`mock` 是**本地假机器人**，用来做确定性验收测试。
@@ -628,7 +631,12 @@ export class BotInstance {
   /** 真正干活：进模型 → 回消息 */
   async #handle(task) {
     const { scope, peerId, text } = task;
-    const key = `${scope}:${peerId}`;
+    /**
+ * ⛔ 键里**必须带机器人 id**（老板要求："每个机器人的会话都是独立的，哪怕连接方式一样"）。
+ *    原来只有 `${scope}:${peerId}` —— 两个都走 DSH 的机器人跟**同一个群/人**说话时，
+ *    会读到同一把 key、续到**同一个 DSH 会话** → 上下文互相串（而且互相覆盖对方的会话 id）。
+ */
+const key = `${this.cfg.id}:${scope}:${peerId}`;
     this.log.trace(`PROCESSING peer=${key} text=${JSON.stringify(text.slice(0, 120))}`);
 
     this.sessions.append(this.cfg.id, scope, peerId, 'user', text);
